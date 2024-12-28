@@ -1,3 +1,16 @@
+Signal with noise.
+
+![Signal with noise](figures/Figure_1.png)
+
+Signal without noise.
+
+![Signal without noise.](figures/Figure_2.png)
+
+Cleaned signal with noise.
+
+![Cleaned signal with noise](figures/Figure_3.png)
+
+
 # spectral-transformer
 A demonstration of transformer-based AI models showcasing their potential in signal processing tasks, such as noise suppression. Highlighted examples include separating human speech and frog sounds, illustrating the versatility and power of modern transformer architectures in audio applications.
 
