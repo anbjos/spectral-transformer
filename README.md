@@ -1,22 +1,28 @@
-Signal with noise.
+# Spectral Transformer
+
+The **Spectral Transformer** repository demonstrates the versatility of transformer-based AI models in signal processing tasks, with a particular focus on **audio applications** like noise suppression. Unlike traditional transformer inputs consisting of tokenized text, this project adapts modern transformer architectures to work directly with **audio signals** represented as mel-spectrograms. The transformers are customized to accommodate this unique input format, enabling highly effective signal analysis and modification.
+
+A key highlight is the integration of neural networks and digital signal processing (DSP) techniques. The results showcase the synergy of these approaches, achieving precise noise suppression while maintaining the **original signal's phase information**. Notably, this approach avoids the use of vocoders for audio reconstruction, ensuring higher fidelity in the output.
+
+Even with a relatively simple transformer network, excellent performance can be achieved in real-world scenarios, as illustrated by the following example. Using the challenging task of separating human speech from background noise (e.g., frog sounds), the network demonstrates its robustness. Specifically:
+
+1. **Signal with Noise** (Figure 1): This represents the input noisy speech signal, containing both human speech and frog sounds.
 
 ![Signal with noise](figures/Figure_1.png)
 
-Signal without noise.
+2. **Signal without Noise** (Figure 2): This is the clean speech signal, used as a reference for comparison.
 
-![Signal without noise.](figures/Figure_2.png)
+![Signal without noise](figures/Figure_2.png)
 
-Cleaned signal with noise.
+3. **Cleaned Signal with Noise** (Figure 3): This is the output of the network, showing its ability to effectively suppress noise and isolate the speech signal, even on out-of-sample data.
 
 ![Cleaned signal with noise](figures/Figure_3.png)
 
 
-# spectral-transformer
-A demonstration of transformer-based AI models showcasing their potential in signal processing tasks, such as noise suppression. Highlighted examples include separating human speech and frog sounds, illustrating the versatility and power of modern transformer architectures in audio applications.
-
 ## Attention Mechanism
+Understanding the [attention mechanism](https://arxiv.org/html/1706.03762v7) is crucial for adapting deep learning architectures to different input formats. While most descriptions use a sequence × embedding input format, this explanation focuses on the embedding × sequence format used in Julia. This foundational overview supports modifications to input/output processing and ensures clarity in the provided code.
 
-The [attention mechanism](https://arxiv.org/html/1706.03762v7) is a foundational concept in modern deep learning architectures, such as the Transformer. It enables models to focus on specific elements of an input sequence when generating an output, effectively capturing dependencies regardless of sequence length. This section provides a step-by-step explanation of how the attention mechanism operates for **a single attention head**, starting with input representation as matrices, followed by transformations into queries, keys, and values, and concluding with the computation of attention scores and outputs. Each step is described in terms of the matrix operations that underlie the mechanism.
+The attention mechanism is a foundational concept in modern deep learning architectures, such as the Transformer. It enables models to focus on specific elements of an input sequence when generating an output, capturing the relationships between elements of the sequence. This section provides a step-by-step explanation of how the attention mechanism operates for **a single attention head**, starting with input representation as matrices, followed by transformations into queries, keys, and values, and concluding with the computation of attention scores and outputs. Each step is described in terms of the matrix operations that underlie the mechanism.
 
 ---
 
@@ -66,7 +72,7 @@ After the transformations:
 
 ### 3. **Attention Score Calculation**
 
-The **attention mechanism** determines the relevance of each element in the sequence to every other element. This is done by computing a similarity score between queries and keys using a **dot product**:
+The **attention mechanism** determines the relevance of each element in the sequence to every other element. This is done by computing a similarity score between queries and keys using a **[dot product](https://en.wikipedia.org/wiki/Dot_product)**:
 
 $$
 \text{Attention Score} = K^T Q
@@ -94,7 +100,7 @@ $$
 
 ### 4. **Softmax to Compute Attention Weights**
 
-The softmax function is applied row-wise to the scaled attention scores to produce attention weights, ensuring that each row forms a probability distribution that sums to 1:
+The [softmax](https://en.wikipedia.org/wiki/Softmax_function) function is applied row-wise to the scaled attention scores to produce attention weights, ensuring that each row forms a probability distribution that sums to 1:
 
 $$
 A = \text{Softmax}\left(\frac{K^T Q}{\sqrt{d_k}}\right)
@@ -156,4 +162,46 @@ In terms of matrix operations:
    O = V A
    $$
 
+## Multi-Head Attention Mechanism
 
+To capture a diverse range of features and relationships in the input data, multi-head attention employs multiple attention "heads" that operate in parallel. Each head focuses on different aspects of the data by independently calculating attention outputs using its own learned weight matrices. This approach allows the model to process and integrate multiple perspectives simultaneously, enabling richer representations of the input.
+
+### Parallel Attention Heads and Matrix Combination
+
+Each of the $h$ attention heads computes its own output matrix:
+
+$$
+O_i = V_i A_i \quad \text{for } i = 1, 2, \dots, h,
+$$
+
+where $O_i \in \mathbb{R}^{d_v \times n}$ represents the output from the $i$-th attention head. To integrate these outputs, the results from all heads are stacked vertically into a single matrix:
+
+$$
+O_{\text{combined}} = 
+\begin{bmatrix}
+O_1 \\
+O_2 \\
+\vdots \\
+O_h
+\end{bmatrix} 
+\in \mathbb{R}^{(h \cdot d_v) \times n}.
+$$
+
+This stacking operation forms a larger matrix where each attention head contributes a block of rows corresponding to its output. The result is a multi-faceted representation of the input that encapsulates the distinct features learned by each head.
+
+### Dimensionality Constraints for Attention Heads
+
+To ensure that the combined output aligns with the model's overall feature dimension $d$, the relationship between the number of attention heads ($h$), the dimension of each head’s output ($d_v$), and the total model dimension ($d$) must satisfy:
+
+$$
+h \cdot d_v = d,
+$$
+
+where:
+- $d$ is the model’s total feature dimension,
+- $h$ is the number of attention heads,
+- $d_v$ is the feature dimension of each head.
+
+This constraint ensures that the combined matrix $O_{\text{combined}}$ has a total of $d$ rows, regardless of how many heads are used. As the number of heads increases, the dimension of each head’s output ($d_v$) must decrease proportionally. This tradeoff balances the model's ability to focus on diverse features across heads with the capacity of individual heads to represent detailed patterns.
+
+By stacking attention outputs in this way, multi-head attention integrates diverse insights from the input data while preserving a structured and scalable approach to feature representation.
