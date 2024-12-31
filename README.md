@@ -209,3 +209,124 @@ where:
 This constraint ensures that the combined matrix $O_{\text{combined}}$ has a total of $d$ rows, regardless of how many heads are used. As the number of heads increases, the dimension of each head’s output ($d_v$) must decrease proportionally. This tradeoff balances the model's ability to focus on diverse features across heads with the capacity of individual heads to represent detailed patterns.
 
 By stacking attention outputs in this way, multi-head attention integrates diverse insights from the input data while preserving a structured and scalable approach to feature representation.
+
+## Attention Layer
+
+The Transformer architecture, introduced in the paper [*Attention Is All You Need*](https://arxiv.org/html/1706.03762v7) (Vaswani et al., 2017), is built around the multi-head self-attention mechanism, supported by feed-forward layers and add and norm operations. This section focuses on these **support layers**, which, as shown in the architecture diagram below. 
+![Transformer architecture](https://arxiv.org/html/1706.03762v7/extracted/1706.03762v7/Figures/ModalNet-21.png)
+
+### First Add and Norm Layer
+
+The first add and norm layer integrates the output of the multi-head attention mechanism back into the network. Multi-head attention can be represented as a function:
+
+$$
+\text{MultiHeadAttention}(X)
+$$
+
+This function processes the input \( X \) through attention heads and combines their outputs into a single representation.
+
+The add and norm layer then performs the following steps:
+
+1. **Residual Connection**: Adds the original input \( X \) to the attention output:
+   $$
+   Y = X + \text{MultiHeadAttention}(X)
+   $$
+
+2. **Layer Normalization**: [Normalizes](https://en.wikipedia.org/wiki/Normalization_(machine_learning)#Layer_normalization) the combined result for stability:
+   $$
+   Z = \text{LayerNorm}(Y)
+   $$
+
+This operation can be written concisely as:
+
+$$
+Z = \text{LayerNorm}(X + \text{MultiHeadAttention}(X))
+$$
+
+It ensures stable gradients and prepares the output for further processing.
+
+
+### Feed-Forward Layer
+
+The feed-forward layer complements multi-head attention by applying position-wise transformations (from [Attention Is All You Need](https://arxiv.org/html/1706.03762v7)) to enrich token representations. It includes an intermediate hidden layer with a larger dimension \( d_\text{ffn} \), typically several times larger than the model dimension \( d \). This enhances the model’s capacity to capture complex patterns.
+
+The layer performs ([ReLU](https://en.wikipedia.org/wiki/Rectifier_(neural_networks)) is the activation function):
+
+1. **Linear Transformation and Activation**:
+   $$
+   H = \text{ReLU}(Z W_1 + b_1), \quad W_1 \in \mathbb{R}^{d_\text{ffn} \times d}, \, b_1 \in \mathbb{R}^{d_\text{ffn}}
+   $$
+
+2. **Second Linear Transformation**:
+   $$
+   F = H W_2 + b_2, \quad W_2 \in \mathbb{R}^{d \times d_\text{ffn}}, \, b_2 \in \mathbb{R}^d
+   $$
+
+The larger intermediate dimension  $d_{ffn}$ allows the layer to model complex interactions before reducing back to $d$. The output is then passed through another add and norm layer for stability.
+
+### Summary of Attention Layer
+
+1. **Multi-Head Attention**:
+   $$
+   \text{MultiHeadAttention}(X) = \text{Concat}(O_1, \dots, O_h) W_O, \quad O_i = \text{Softmax}\left(\frac{K_i^T Q_i}{\sqrt{d_k}}\right) V_i
+   $$
+
+2. **Add and Norm**:
+   $$
+   Z = \text{LayerNorm}(X + \text{MultiHeadAttention}(X))
+   $$
+
+3. **Feed-Forward**:
+   $$
+   F = \text{ReLU}(Z W_1 + b_1) W_2 + b_2
+   $$
+
+4. **Second Add and Norm**:
+   $$
+   \text{Output}_{\text{Attention Layer}} = \text{LayerNorm}(Z + F)
+   $$
+
+The final output, \( \text{Output}_{\text{Attention Layer}} \), represents the result of processing through the attention layer, integrating multi-head attention and feed-forward operations.
+
+---
+
+## Transformer Block
+
+The Transformer architecture, originally introduced for translation in [*Attention Is All You Need*](https://arxiv.org/html/1706.03762v7), consists of \( N \) stacked layers of encoder and decoder blocks. The **encoder** processes input sequences into high-dimensional representations, while the **decoder** generates output sequences token by token.
+
+Frameworks like [Transformers.jl](https://github.com/chengchingwen/Transformers.jl) provide implementations of these components, making it easy to instantiate and customize Transformer blocks in Julia.
+
+---
+
+### Encoder and Decoder Use Cases
+
+The encoder and decoder can be used independently for various tasks:
+
+- **Encoder-Only**: For tasks like classification or sound processing, only the encoder is needed. For example, sound analysis uses the encoder to extract features, simplifying training by avoiding sequence generation.
+- **Decoder-Only**: Models like **ChatGPT** and **Bard** use decoders for text generation by attending to previously generated tokens.
+
+---
+
+### Simplifying Training with Encoders
+
+Encoders process input sequences in parallel, avoiding the need for an **attention mask** used in decoders to prevent "looking ahead." This simplification is particularly useful in applications like sound processing and other non-generative tasks.
+
+---
+
+### Example: Instantiating a Transformer Block in Julia
+
+Using the [Transformers.jl](https://github.com/chengchingwen/Transformers.jl) package, you can instantiate a Transformer block as follows:
+
+```julia
+using Transformers
+
+# Instantiate a Transformer encoder block
+transformer_block = TransformerBlock(
+    model_dim = 512,       # Dimension of the model (d)
+    num_heads = 8,         # Number of attention heads
+    ffn_dim = 2048,        # Feed-forward layer dimension (d_ffn)
+    num_layers = 6         # Number of stacked layers (N)
+)
+```
+
+This creates a Transformer block with an encoder structure, ready to process input sequences for tasks like sound processing or text classification.
