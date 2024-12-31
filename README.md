@@ -20,7 +20,7 @@ Even with a relatively simple transformer network, excellent performance can be 
 
 
 ## Attention Mechanism
-Understanding the [attention mechanism](https://arxiv.org/html/1706.03762v7) is crucial for adapting deep learning architectures to different input formats. While most descriptions use a sequence × embedding input format, this explanation focuses on the embedding × sequence format used in Julia. This foundational overview supports modifications to input/output processing and ensures clarity in the provided code.
+Understanding the [attention mechanism](https://arxiv.org/html/1706.03762v7) is crucial for adapting deep learning architectures to various input formats. While most explanations utilize a sequence × embedding input format, this discussion emphasizes the embedding × sequence format as implemented in Julia. Additionally, this documentation aims to provide a comprehensive overview of the concepts that may initially seem challenging, breaking them down in a clear and accessible manner. By doing so, it not only facilitates modifications to input/output processing but also ensures the provided code is both intuitive and adaptable.
 
 The attention mechanism is a foundational concept in modern deep learning architectures, such as the Transformer. It enables models to focus on specific elements of an input sequence when generating an output, capturing the relationships between elements of the sequence. This section provides a step-by-step explanation of how the attention mechanism operates for **a single attention head**, starting with input representation as matrices, followed by transformations into queries, keys, and values, and concluding with the computation of attention scores and outputs. Each step is described in terms of the matrix operations that underlie the mechanism.
 
@@ -61,7 +61,7 @@ Here:
 
 - $d_v$ is the dimension of the value vectors:  
 
-These weight matrices $W_Q$, $W_K$, and $W_V$ are learned during training.
+These weight matrices $W_Q$, $W_K$, and $W_V$ are learned during training, with each attention head independently learning its own set of weight matrices.
 
 After the transformations:
 - $Q \in \mathbb{R}^{d_k \times n}$,
@@ -72,7 +72,7 @@ After the transformations:
 
 ### 3. **Attention Score Calculation**
 
-The **attention mechanism** determines the relevance of each element in the sequence to every other element. This is done by computing a similarity score between queries and keys using a **[dot product](https://en.wikipedia.org/wiki/Dot_product)**:
+The attention mechanism determines the relevance of each element in the sequence to every other element. This is done by computing a **similarity** score between queries and keys using a [dot product](https://en.wikipedia.org/wiki/Dot_product):
 
 $$
 \text{Attention Score} = K^T Q
@@ -143,24 +143,28 @@ which is the output of the attention mechanism.
 In terms of matrix operations:
 
 1. Compute query, key, and value matrices:
-   $$
-   Q = W_Q X, \quad K = W_K X, \quad V = W_V X
-   $$
+
+$$
+Q = W_Q X, \quad K = W_K X, \quad V = W_V X
+$$
 
 2. Compute attention scores:
-   $$
-   S = \frac{K^T Q}{\sqrt{d_k}}
-   $$
+
+$$
+S = \frac{K^T Q}{\sqrt{d_k}}
+$$
 
 3. Apply softmax to scores to get attention weights:
-   $$
-   A = \text{Softmax}(S)
-   $$
+
+$$
+A = \text{Softmax}(S)
+$$
 
 4. Compute the output as a weighted sum of values:
-   $$
-   O = V A
-   $$
+
+$$
+O = V A
+$$
 
 ## Multi-Head Attention Mechanism
 

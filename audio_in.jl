@@ -16,6 +16,7 @@ enable_gpu(CUDA.functional())
 
 using PyPlot; pygui(true)
 
+
 function envelope(u, fs, τ_attack=0.01, τ_decay=0.1)
     α_attack = exp(-1 / (fs * τ_attack))
     α_decay = exp(-1 / (fs * τ_decay))
@@ -197,7 +198,7 @@ end
 
 n_samples=16384
 fs=8192
-noises=read_noises("./data/4/archive/esc50.csv", "frog", "./data/4/archive/audio/audio/16000/", fs) |> 
+noises=read_noises("./data/noise/archive/esc50.csv", "frog", "./data/noise/archive/audio/audio/16000/", fs) |> 
     shuffle_n_split |>
     splits -> overlapping_splits(splits, 16384, 12288)
 
