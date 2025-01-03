@@ -1,21 +1,22 @@
-using Pkg
-Pkg.activate(".")
+#using Pkg
+#Pkg.activate(".")
 
-using Flux, Statistics, ProgressMeter
-using CUDA
-using JSON
-using CSV
+#using Flux, Statistics, ProgressMeter
+#using CUDA
+#using JSON
+#using CSV
+#using Random
+#using CUDA
+#using Transformers
+
 using Sound
 using WAV
 using DSP
 using FFTW
-using Random
-using CUDA
-using Transformers
-enable_gpu(CUDA.functional())
+
+using LinearAlgebra
 
 using PyPlot; pygui(true)
-
 
 function envelope(u, fs, τ_attack=0.01, τ_decay=0.1)
     α_attack = exp(-1 / (fs * τ_attack))
@@ -98,13 +99,26 @@ function whiten!(x,y)
     return (offset=offset,scale=scale)
 end
 
-function clip_noise(X,Y,threshold=-60)
+function whiten!(x)
+    offset=mean(x)
+    x.-=offset
+    scale=std(x[:])
+    x./=scale
+    return (offset=offset,scale=scale)
+end
+
+function clip_noise(X::AbstractMatrix, threshold=-60)
+    min_noise=maximum(X)*db2pow(threshold)
+    X= X .|> U -> max(U,min_noise)
+    return X
+end
+
+function clip_noise(X::AbstractMatrix,Y::AbstractMatrix, threshold=-60)
     min_noise=max(maximum(X),maximum(Y))*db2pow(threshold)
     X= X .|> U -> max(U,min_noise)
     Y= Y .|> U -> max(U,min_noise)
     return X,Y
 end
-
 
 time_chain(u, fs, n=length(u)) = normalize!(u,fs) |> 
                 u -> u[1:n,1:1] 
@@ -115,9 +129,7 @@ freq_chain(U, A) = U |> U -> A*U |>
 power_chain(U, m, fs, w) =  spectrogram(U, m; fs=fs, window=w) |>
         power
 
-
-
-function audio_chain(signal, noise, n, w, A)
+function audio_chain(signal, noise, w, A)
     m=length(w)
 
     y=signal
@@ -136,11 +148,6 @@ function audio_chain(signal, noise, n, w, A)
     
     whiten!(X,Y)
     return X,Y
-end
-
-function overlapping_splits(namedtuple::NamedTuple, args...)
-    result=map(t -> overlapping_splits(t, args...),values(namedtuple))
-    return NamedTuple{keys(namedtuple)}(result)
 end
 
 function read_signals(data_description, path, speaker, fs, n_samples)
@@ -180,6 +187,11 @@ function overlapping_splits(v::AbstractVector, n::Int, step::Int)
     return result
 end
 
+function overlapping_splits(namedtuple::NamedTuple, args...)
+    result=map(t -> overlapping_splits(t, args...),values(namedtuple))
+    return NamedTuple{keys(namedtuple)}(result)
+end
+
 function read_noises(data_description, type, path, fs)
     noises=Vector{Matrix{Float64}}()
     noise_files=CSV.read(data_description, identity)
@@ -195,22 +207,8 @@ function read_noises(data_description, type, path, fs)
     return noises
 end
 
-
-n_samples=16384
-fs=8192
-noises=read_noises("./data/noise/archive/esc50.csv", "frog", "./data/noise/archive/audio/audio/16000/", fs) |> 
-    shuffle_n_split |>
-    splits -> overlapping_splits(splits, 16384, 12288)
-
-signals=read_signals("./data/fluent_speech_commands_dataset/data/test_data.csv", "./data/fluent_speech_commands_dataset/", "7B4XmNppyrCK977p", fs, n_samples) |>
-    shuffle_n_split
-
-
-
-
 function dataloader(signals,noises)
     m=256
-    n=16384
     w=hanning(m+1)[2:m+1]
     A=mel_filter_bank(26, m, fs, 300, fs/2)
     
@@ -224,7 +222,7 @@ function dataloader(signals,noises)
     for j in 1:n_signal
         for k in 1:n_noises
             jk += 1
-            X[:,:,jk],Y[:,:,jk]=audio_chain(signals[j], noises[k], n, w, A) 
+            X[:,:,jk],Y[:,:,jk]=audio_chain(signals[j], noises[k], w, A) 
         end
     end
     masks=size(X,2)*ones(Int32,size(X,3)) |> todevice
@@ -234,13 +232,22 @@ function dataloader(signals,noises)
     return result
 end
 
+n_samples=16384
+fs=8192
+noises=read_noises("./data/environmental_sound_classification_50/archive/esc50.csv", "frog", "./data/environmental_sound_classification_50/archive/audio/audio/16000/", fs) |> 
+    shuffle_n_split |>
+    splits -> overlapping_splits(splits, 16384, 12288)
+
+signals=read_signals("./data/fluent_speech_commands_dataset/data/test_data.csv", "./data/fluent_speech_commands_dataset/", "7B4XmNppyrCK977p", fs, n_samples) |>
+    shuffle_n_split
 
 train=dataloader(signals.train,noises.train)
 test=dataloader(signals.test,noises.test)
 
 
+#############################################
 
-sample=first(train)
+sample=first(test)
 sample1=(x=sample.x[:,:,1:1],y=sample.y[:,:,1:1],mask=sample.mask[1:1])
 input=withmask(sample1)
 input=withmask(sample)
@@ -260,9 +267,6 @@ colorbar()
 figure(figsize=(10, 5))
 imshow(ŷ.hidden_state[:,:,1], aspect = "auto")
 colorbar()
-
-
-
 
 figure(figsize=(10, 5))
 imshow(X[:,:,10], aspect = "auto")

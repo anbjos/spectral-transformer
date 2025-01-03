@@ -1,20 +1,20 @@
 using Pkg
 Pkg.activate(".")
 
-using Flux, Statistics, ProgressMeter
-using Flux.Losses # for mse
+using Flux, Flux.Losses
+using Statistics
 
-using CUDA
-using Transformers
-using Transformers.Layers
-using Transformers.TextEncoders
-using CSV, BSON, JSON
+using Transformers, Transformers.Layers
+using CSV, BSON # , JSON
 using Functors
 using BenchmarkTools
 using Random
-#using ProgressBars
 
-enable_gpu(CUDA.functional()) # make `todevice` work on gpu if available
+using CUDA; enable_gpu(CUDA.functional())
+
+#############################################
+#RUN TRAINING DATA
+#############################################
 
 d_in=26                          # Input data Dimention
 d_out=d_in                       # Output data Dimention
@@ -55,9 +55,6 @@ function (model::Model)(input)
     return result
 end
 
-
-#RUN TRAINING DATA
-
 sample=first(train)
 input=withmask(sample)
 model(input.x)
@@ -97,10 +94,13 @@ end
 @time train!()
 ϵ=loss(model,input)
 
+BSON.@load "signals_n_noises.bson" signals_n_noises
+(signals,noises)=signals_n_noises
 BSON.@load "mymodel.bson" model
 model=model |> todevice
 
 model=Model(model.position_embedding, model.projection, withmask, model.transformer, model.antiprojection) |> cpu
+signals_n_noises=(signals,noises)
 using BSON: @save
 @save "mymodel.bson" model
-
+@save "signals_n_noises.bson" signals_n_noises

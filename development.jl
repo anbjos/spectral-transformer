@@ -188,6 +188,8 @@ ic=ignored_columns(M)
 U0=U[.~ic]
 M0=M[:,.~ic]
 
+sum(U)
+
 Y0=M0*U0
 
 x=(M0*Diagonal(U0)*M0')\Y0
@@ -195,7 +197,7 @@ x=(M0*Diagonal(U0)*M0')\Y0
 
 plot(M0'*x)
 
-V=W'
+V=M'
 V*Y0
 
 using LinearAlgebra
@@ -212,6 +214,7 @@ x=(M[:,.~ic]*Diagonal(U[.~ic])*M[:,.~ic]')\Y1 .|> x -> clamp(x,0.0,1.0)
 plot(x)
 
 attenuation=M[:,.~ic]'*x
+plot(attenuation)
 
 V=zeros(size(U))
 V[.~ic]=attenuation .* U[.~ic]

@@ -228,14 +228,16 @@ This function processes the input \( X \) through attention heads and combines t
 The add and norm layer then performs the following steps:
 
 1. **Residual Connection**: Adds the original input \( X \) to the attention output:
-   $$
-   Y = X + \text{MultiHeadAttention}(X)
-   $$
+
+$$
+Y = X + \text{MultiHeadAttention}(X)
+$$
 
 2. **Layer Normalization**: [Normalizes](https://en.wikipedia.org/wiki/Normalization_(machine_learning)#Layer_normalization) the combined result for stability:
-   $$
-   Z = \text{LayerNorm}(Y)
-   $$
+
+$$
+Z = \text{LayerNorm}(Y)
+$$
 
 This operation can be written concisely as:
 
@@ -245,88 +247,105 @@ $$
 
 It ensures stable gradients and prepares the output for further processing.
 
-
 ### Feed-Forward Layer
 
-The feed-forward layer complements multi-head attention by applying position-wise transformations (from [Attention Is All You Need](https://arxiv.org/html/1706.03762v7)) to enrich token representations. It includes an intermediate hidden layer with a larger dimension \( d_\text{ffn} \), typically several times larger than the model dimension \( d \). This enhances the model’s capacity to capture complex patterns.
+1. **Input Representation**:  
+   The input to the feed-forward layer is denoted as \( X \), where \( X \in \mathbb{R}^{d \times n} \), with \( d \) representing the feature dimension of each token and \( n \) being the number of tokens in the sequence.
 
-The layer performs ([ReLU](https://en.wikipedia.org/wiki/Rectifier_(neural_networks)) is the activation function):
+2. **Column-Wise Embedding**:  
+   In this implementation, the embedding is column-wise, meaning the weights are multiplied to the data, not vice versa. This aligns with the matrix representation where each column corresponds to a token.
+
+The feed-forward layer performs the following steps:
 
 1. **Linear Transformation and Activation**:
-   $$
-   H = \text{ReLU}(Z W_1 + b_1), \quad W_1 \in \mathbb{R}^{d_\text{ffn} \times d}, \, b_1 \in \mathbb{R}^{d_\text{ffn}}
-   $$
+
+$$
+H = \text{ReLU}(W_1 X + b_1), \quad W_1 \in \mathbb{R}^{d_\text{ffn} \times d}, \, b_1 \in \mathbb{R}^{d_\text{ffn}}
+$$
 
 2. **Second Linear Transformation**:
-   $$
-   F = H W_2 + b_2, \quad W_2 \in \mathbb{R}^{d \times d_\text{ffn}}, \, b_2 \in \mathbb{R}^d
-   $$
 
-The larger intermediate dimension  $d_{ffn}$ allows the layer to model complex interactions before reducing back to $d$. The output is then passed through another add and norm layer for stability.
+$$
+F = W_2 H + b_2, \quad W_2 \in \mathbb{R}^{d \times d_\text{ffn}}, \, b_2 \in \mathbb{R}^d
+$$
+
+Here, the intermediate dimension \( d_\text{ffn} \) is typically several times larger than \( d \), allowing the layer to learn richer token-level representations. The feed-forward layer applies these transformations independently to each token (position-wise).
+
+3. **Integration with Add and Norm**:  
+   The output \( F \) is combined with the input \( X \) using another add and norm layer for stability:
+
+$$
+\text{Output}_{\text{Attention Layer}} = \text{LayerNorm}(X + F)
+$$
+
+This ensures the model captures complex patterns at each position while maintaining stable gradients during training.
 
 ### Summary of Attention Layer
 
 1. **Multi-Head Attention**:
-   $$
-   \text{MultiHeadAttention}(X) = \text{Concat}(O_1, \dots, O_h) W_O, \quad O_i = \text{Softmax}\left(\frac{K_i^T Q_i}{\sqrt{d_k}}\right) V_i
-   $$
+
+$$
+\text{MultiHeadAttention}(X) = \text{Concat}(O_1, \dots, O_h) W_O, \quad O_i = \text{Softmax}\left(\frac{K_i^T Q_i}{\sqrt{d_k}}\right) V_i
+$$
 
 2. **Add and Norm**:
-   $$
-   Z = \text{LayerNorm}(X + \text{MultiHeadAttention}(X))
-   $$
+
+$$
+Z = \text{LayerNorm}(X + \text{MultiHeadAttention}(X))
+$$
 
 3. **Feed-Forward**:
-   $$
-   F = \text{ReLU}(Z W_1 + b_1) W_2 + b_2
-   $$
+
+$$
+F = \text{ReLU}(W_1 Z + b_1) W_2 + b_2
+$$
 
 4. **Second Add and Norm**:
-   $$
-   \text{Output}_{\text{Attention Layer}} = \text{LayerNorm}(Z + F)
-   $$
 
-The final output, \( \text{Output}_{\text{Attention Layer}} \), represents the result of processing through the attention layer, integrating multi-head attention and feed-forward operations.
+$$
+\text{Output}_{\text{Attention Layer}} = \text{LayerNorm}(X + F)
+$$
+
+The final output, $ \text{Output}_{\text{Attention Layer}} $, represents the result of processing through the attention layer, integrating multi-head attention and feed-forward operations.
 
 ---
 
 ## Transformer Block
 
-The Transformer architecture, originally introduced for translation in [*Attention Is All You Need*](https://arxiv.org/html/1706.03762v7), consists of \( N \) stacked layers of encoder and decoder blocks. The **encoder** processes input sequences into high-dimensional representations, while the **decoder** generates output sequences token by token.
-
-Frameworks like [Transformers.jl](https://github.com/chengchingwen/Transformers.jl) provide implementations of these components, making it easy to instantiate and customize Transformer blocks in Julia.
+The system considered here is an **encoder**, composed of \( N \) stacked **Transformer attention layers**, each integrating multi-head attention, feed-forward layers, and add and norm operations. These layers process input sequences into high-dimensional representations, making the encoder suitable for tasks like classification, sound processing, or summarization.
 
 ---
 
-### Encoder and Decoder Use Cases
+### Encoder and Decoder in the Original Transformer
 
-The encoder and decoder can be used independently for various tasks:
+The original Transformer architecture, as introduced in [*Attention Is All You Need*](https://arxiv.org/html/1706.03762v7), included both an encoder and a decoder:
 
-- **Encoder-Only**: For tasks like classification or sound processing, only the encoder is needed. For example, sound analysis uses the encoder to extract features, simplifying training by avoiding sequence generation.
-- **Decoder-Only**: Models like **ChatGPT** and **Bard** use decoders for text generation by attending to previously generated tokens.
+1. **Encoder**:
+   - Processes input sequences into high-dimensional representations.
+   - Fully parallelizable, making it efficient for non-generative tasks.
+
+2. **Decoder**:
+   - Generates output sequences token by token, attending to both encoder outputs and previously generated tokens.
+   - Requires an **attention mask** during training to prevent "looking ahead."
+
+While encoder-decoder configurations are used for tasks like translation and summarization (e.g., **BART**), encoder-only systems simplify training and are ideal for tasks such as classification and sound processing. Decoder-only models, like **ChatGPT**, focus on text generation.
 
 ---
 
-### Simplifying Training with Encoders
+### Example: Instantiating an Encoder Block in Julia
 
-Encoders process input sequences in parallel, avoiding the need for an **attention mask** used in decoders to prevent "looking ahead." This simplification is particularly useful in applications like sound processing and other non-generative tasks.
-
----
-
-### Example: Instantiating a Transformer Block in Julia
-
-Using the [Transformers.jl](https://github.com/chengchingwen/Transformers.jl) package, you can instantiate a Transformer block as follows:
+Using [Transformers.jl](https://github.com/chengchingwen/Transformers.jl):
 
 ```julia
 using Transformers
 
-# Instantiate a Transformer encoder block
+# Instantiate an encoder block
 transformer_block = TransformerBlock(
-    model_dim = 512,       # Dimension of the model (d)
-    num_heads = 8,         # Number of attention heads
-    ffn_dim = 2048,        # Feed-forward layer dimension (d_ffn)
-    num_layers = 6         # Number of stacked layers (N)
+    model_dim = 512,       # Model dimension (d)
+    num_heads = 8,         # Attention heads
+    ffn_dim = 2048,        # Feed-forward dimension (d_ffn)
+    num_layers = 6         # Number of layers (N)
 )
 ```
 
-This creates a Transformer block with an encoder structure, ready to process input sequences for tasks like sound processing or text classification.
+Frameworks like [Transformers.jl](https://github.com/chengchingwen/Transformers.jl) provide modular implementations, enabling easy customization of encoder blocks. This example demonstrates how to set up a stack of \( N \) attention layers for encoder-based tasks.
