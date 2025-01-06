@@ -17,7 +17,7 @@ Even with a relatively simple transformer network, excellent performance can be 
 3. **Cleaned Signal with Noise** (Figure 3): This is the output of the network, showing its ability to effectively suppress noise and isolate the speech signal, even on out-of-sample data.
 
 ![Cleaned signal with noise](figures/result.png)
-![Listen to result](figures/result.wav)
+![Listen to result](https://github.com/anbjos/spectral-transformer/blob/main/figures/result.wav)
 
 ### Sample Audio
 
