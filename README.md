@@ -2,27 +2,34 @@
 
 The **Spectral Transformer** repository demonstrates the versatility of transformer-based AI models in signal processing tasks, with a particular focus on **audio applications** like noise suppression. Unlike traditional transformer inputs consisting of tokenized text, this project adapts modern transformer architectures to work directly with **audio signals** represented as mel-spectrograms. The transformers are customized to accommodate this unique input format, enabling highly effective signal analysis and modification.
 
-A key highlight is the integration of neural networks and digital signal processing (DSP) techniques. The results showcase the synergy of these approaches, achieving precise noise suppression while maintaining the **original signal's phase information**. Notably, this approach avoids the use of vocoders for audio reconstruction, ensuring higher fidelity in the output.
+A key highlight is the integration of neural networks and digital signal processing (DSP) techniques. The results showcase the synergy of these approaches, achieving precise noise suppression while maintaining the **original signal's phase information**. Notably, this approach avoids the use of [vocoders](https://en.wikipedia.org/wiki/Phase_vocoder) for audio reconstruction, ensuring higher fidelity in the output.
 
 Even with a relatively simple transformer network, excellent performance can be achieved in real-world scenarios, as illustrated by the following example. Using the challenging task of separating human speech from background noise (e.g., frog sounds), the network demonstrates its robustness. Specifically:
 
 1. **Signal with Noise** (Figure 1): This represents the input noisy speech signal, containing both human speech and frog sounds.
 
-![Signal with noise](figures/Figure_1.png)
+![Signal with noise](figures/with_noise.png)
 
 2. **Signal without Noise** (Figure 2): This is the clean speech signal, used as a reference for comparison.
 
-![Signal without noise](figures/Figure_2.png)
+![Signal without noise](figures/signal.png)
 
 3. **Cleaned Signal with Noise** (Figure 3): This is the output of the network, showing its ability to effectively suppress noise and isolate the speech signal, even on out-of-sample data.
 
-![Cleaned signal with noise](figures/Figure_3.png)
+![Cleaned signal with noise](figures/result.png)
+
+### Sample Audio
+
+<audio controls>
+  <source src="figures/result.wav" type="audio/wav">
+  Your browser does not support the audio element.
+</audio>
 
 
 ## Attention Mechanism
-Understanding the [attention mechanism](https://arxiv.org/html/1706.03762v7) is crucial for adapting deep learning architectures to various input formats. While most explanations utilize a sequence × embedding input format, this discussion emphasizes the embedding × sequence format as implemented in Julia. Additionally, this documentation aims to provide a comprehensive overview of the concepts that may initially seem challenging, breaking them down in a clear and accessible manner. By doing so, it not only facilitates modifications to input/output processing but also ensures the provided code is both intuitive and adaptable.
+Understanding the [attention mechanism](https://arxiv.org/html/1706.03762v7) is crucial for adapting deep learning architectures to various input formats. While most explanations utilize a sequence × embedding input format, this discussion emphasizes the embedding × sequence format as implemented in [Julia](https://julialang.org/). Additionally, this documentation aims to provide a comprehensive overview of the concepts that may initially seem challenging, breaking them down in a clear and accessible manner. By doing so, it not only facilitates modifications to input/output processing but also ensures the provided code is both intuitive and adaptable.
 
-The attention mechanism is a foundational concept in modern deep learning architectures, such as the Transformer. It enables models to focus on specific elements of an input sequence when generating an output, capturing the relationships between elements of the sequence. This section provides a step-by-step explanation of how the attention mechanism operates for **a single attention head**, starting with input representation as matrices, followed by transformations into queries, keys, and values, and concluding with the computation of attention scores and outputs. Each step is described in terms of the matrix operations that underlie the mechanism.
+The attention mechanism is a foundational concept in modern deep learning architectures, such as the Transformer. It enables models to focus on specific elements of an input sequence when generating an output, capturing the relationships between elements of the sequence. This section provides a step-by-step explanation of how the attention mechanism operates for **a single attention head**, starting with input representation as matrices, followed by transformations into **queries (Q)**, **keys (K)**, and **values (V)**—all of which are *learned* representations rather than direct input data. The similarities between **Q** and **K** are then measured using a dot product, yielding weights that indicate how relevant each position is relative to the current query. These weights are subsequently applied to **V**, allowing the model to focus on and aggregate information from different parts of the sequence. Each step is described in terms of the matrix operations that underlie the mechanism.
 
 ---
 
@@ -42,7 +49,7 @@ where each column corresponds to the representation of an element in the sequenc
 
 ### 2. **Linear Transformations to Obtain Query, Key, and Value**
 
-Each element of the input sequence is transformed into three separate representations: **query ($Q$)**, **key ($K$)**, and **value ($V$)**. These are computed using learnable weight matrices. Since the input $X$ is $d \times n$, the transformation involves matrix multiplication:
+Each element of the input sequence is transformed into three separate representations: **query ($Q$)**, **key ($K$)**, and **value ($V$)** using weight matrices:
 
 $$
 Q = W_Q X \quad \text{where} \quad W_Q \in \mathbb{R}^{d_k \times d}
@@ -57,11 +64,10 @@ V = W_V X \quad \text{where} \quad W_V \in \mathbb{R}^{d_v \times d}
 $$
 
 Here:
-- $d_k$ is the dimension of the query and key vectors:  
+- $d_k$ is the dimension of the query and key vectors.  
+- $d_v$ is the dimension of the value vectors.
 
-- $d_v$ is the dimension of the value vectors:  
-
-These weight matrices $W_Q$, $W_K$, and $W_V$ are learned during training, with each attention head independently learning its own set of weight matrices.
+The weight matrices $W_Q$, $W_K$, and $W_V$ are trained during the learning process, with each attention head independently learning its own set of weights.
 
 After the transformations:
 - $Q \in \mathbb{R}^{d_k \times n}$,
@@ -249,36 +255,34 @@ It ensures stable gradients and prepares the output for further processing.
 
 ### Feed-Forward Layer
 
-1. **Input Representation**:  
-   The input to the feed-forward layer is denoted as \( X \), where \( X \in \mathbb{R}^{d \times n} \), with \( d \) representing the feature dimension of each token and \( n \) being the number of tokens in the sequence.
-
-2. **Column-Wise Embedding**:  
-   In this implementation, the embedding is column-wise, meaning the weights are multiplied to the data, not vice versa. This aligns with the matrix representation where each column corresponds to a token.
-
-The feed-forward layer performs the following steps:
+The feed-forward layer processes the normalized output $Z$ with two linear transformations and a ReLU activation:
 
 1. **Linear Transformation and Activation**:
 
 $$
-H = \text{ReLU}(W_1 X + b_1), \quad W_1 \in \mathbb{R}^{d_\text{ffn} \times d}, \, b_1 \in \mathbb{R}^{d_\text{ffn}}
+H = \text{ReLU}(W_1 Z + b_1)
 $$
+
+where $W_1 \in \mathbb{R}^{d_\text{ffn} \times d}$ and $b_1 \in \mathbb{R}^{d_\text{ffn}}$. Typically, $d_\text{ffn}$ is set to **4 times** the input dimension $d$, allowing the layer to model more complex interactions.
 
 2. **Second Linear Transformation**:
 
 $$
-F = W_2 H + b_2, \quad W_2 \in \mathbb{R}^{d \times d_\text{ffn}}, \, b_2 \in \mathbb{R}^d
+F = W_2 H + b_2
 $$
 
-Here, the intermediate dimension \( d_\text{ffn} \) is typically several times larger than \( d \), allowing the layer to learn richer token-level representations. The feed-forward layer applies these transformations independently to each token (position-wise).
+where $W_2 \in \mathbb{R}^{d \times d_\text{ffn}}$ and $b_2 \in \mathbb{R}^d$. This transformation reduces the dimension back to $d$, ensuring the output size remains consistent with the original input.
 
-3. **Integration with Add and Norm**:  
-   The output \( F \) is combined with the input \( X \) using another add and norm layer for stability:
+Finally, the result is integrated using another add and norm layer:
 
 $$
-\text{Output}_{\text{Attention Layer}} = \text{LayerNorm}(X + F)
+\text{Output}_{\text{Attention Layer}} = \text{LayerNorm}(Z + F)
 $$
 
-This ensures the model captures complex patterns at each position while maintaining stable gradients during training.
+**Why increase and then decrease the dimension?**  
+Increasing the dimension to $d_\text{ffn}$ (typically $4d$) enables the model to capture richer and more complex features in a higher-dimensional space. Reducing the dimension back to $d$ ensures the output remains manageable and compatible with the rest of the architecture, while still benefiting from the complex intermediate representations.
+
+---
 
 ### Summary of Attention Layer
 
@@ -306,13 +310,13 @@ $$
 \text{Output}_{\text{Attention Layer}} = \text{LayerNorm}(X + F)
 $$
 
-The final output, $ \text{Output}_{\text{Attention Layer}} $, represents the result of processing through the attention layer, integrating multi-head attention and feed-forward operations.
+The final output, $Output_{\text{Attention Layer}}$, represents the result of processing through the attention layer, integrating multi-head attention and feed-forward operations.
 
 ---
 
 ## Transformer Block
 
-The system considered here is an **encoder**, composed of \( N \) stacked **Transformer attention layers**, each integrating multi-head attention, feed-forward layers, and add and norm operations. These layers process input sequences into high-dimensional representations, making the encoder suitable for tasks like classification, sound processing, or summarization.
+The system considered here is an **encoder**, composed of $N$ stacked **Transformer attention layers**, each integrating multi-head attention, feed-forward layers, and add and norm operations. These layers process input sequences into high-dimensional representations, making the encoder suitable for tasks like classification, sound processing, or summarization.
 
 ---
 
