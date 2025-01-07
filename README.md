@@ -9,22 +9,17 @@ Even with a relatively simple transformer network, excellent performance can be 
 1. **Signal with Noise** (Figure 1): This represents the input noisy speech signal, containing both human speech and frog sounds.
 
 ![Signal with noise](figures/with_noise.png)
+![Listen to signal with noise](https://github.com/anbjos/spectral-transformer/blob/main/figures/with_noise.wav) (Choose "Download Raw" to hear the audio)
 
 2. **Signal without Noise** (Figure 2): This is the clean speech signal, used as a reference for comparison.
 
 ![Signal without noise](figures/signal.png)
+![Listen to signal](https://github.com/anbjos/spectral-transformer/blob/main/figures/signal.wav) (Choose "Download Raw" to hear the audio)
 
 3. **Cleaned Signal with Noise** (Figure 3): This is the output of the network, showing its ability to effectively suppress noise and isolate the speech signal, even on out-of-sample data.
 
 ![Cleaned signal with noise](figures/result.png)
-![Listen to result](https://github.com/anbjos/spectral-transformer/blob/main/figures/result.wav)
-
-### Sample Audio
-
-<audio controls>
-  <source src="figures/result.wav" type="audio/wav">
-  Your browser does not support the audio element.
-</audio>
+![Listen to result](https://github.com/anbjos/spectral-transformer/blob/main/figures/result.wav) (Choose "Download Raw" to hear the audio)
 
 
 ## Attention Mechanism
@@ -354,3 +349,298 @@ transformer_block = TransformerBlock(
 ```
 
 Frameworks like [Transformers.jl](https://github.com/chengchingwen/Transformers.jl) provide modular implementations, enabling easy customization of encoder blocks. This example demonstrates how to set up a stack of \( N \) attention layers for encoder-based tasks.
+
+---
+
+## Input and Output Embedding for Audio in the Frequency Domain
+
+In our **noise suppression** application, we operate on **audio signals in the frequency domain** using a matrix $U \in \mathbb{R}^{d_U \times n}$, where:
+
+- $d_U$ is the **feature dimension** (e.g., mel-frequency bins),
+- $n$ is the **sequence length** (e.g., number of time frames).
+
+### Input Embedding
+
+Before passing $U$ into the Transformer, we apply an **Input Embedding** step that projects $U$ to the model’s embedding dimension $d$ using a linear layer:
+
+$$
+\text{Embedding}(U) = W_{\text{emb}} \, U,
+$$
+
+where $W_{\text{emb}} \in \mathbb{R}^{d \times d_U}$. Thus,
+
+$$
+\text{Embedding}(U) \in \mathbb{R}^{d \times n}.
+$$
+
+Each column of $\text{Embedding}(U)$ represents a sequence element, enabling the Transformer to process the audio data effectively.
+
+### Output Projection
+
+After the Transformer processes the embedded features, we convert the output back to the original audio feature space through an **Output Projection** step, implemented as another linear layer:
+
+$$
+\text{OutputProjection}(Y) = W_{\text{out}} \, Y,
+$$
+
+where $W_{\text{out}} \in \mathbb{R}^{d_U \times d}$ and $Y \in \mathbb{R}^{d \times n}$. Consequently,
+
+$$
+\text{OutputProjection}(Y) \in \mathbb{R}^{d_U \times n}.
+$$
+
+### Independent Learned Transformations
+
+Both the **Input Embedding** matrix $W_{\text{emb}}$ and the **Output Projection** matrix $W_{\text{out}}$ are **learned independently** during training. There is **no enforced relationship** between them, allowing each to optimize its transformation for its specific role:
+
+- **Input Embedding ($W_{\text{emb}}$):** Projects raw audio features into the Transformer's embedding space.
+- **Output Projection ($W_{\text{out}}$):** Maps the Transformer's output back to the original audio feature space.
+
+### Summary
+
+In this noise suppression system:
+
+- **Input Embedding:** Transforms frequency-domain audio features into the Transformer's embedding space via a learned linear layer.
+- **Output Projection:** Converts the Transformer's output back to the original audio feature space through a separate learned linear layer.
+
+Both embeddings are **independently learned**, ensuring optimal transformations for noise suppression without imposed constraints.
+
+---
+
+## Positional Encoding
+
+The Transformer views its input matrix $\mathbf{U}$ as consisting of **columns** that represent elements in a sequence:
+
+$$
+\mathbf{U} = \bigl[\mathbf{u}_1,\;\mathbf{u}_2,\;\dots,\;\mathbf{u}_n\bigr].
+$$
+
+By default, the dot-product self-attention mechanism has **no inherent sense** of the order of these columns within the sequence. To introduce this ordering information, we define the positional encoding as a function:
+
+$$
+\text{PositionalEncoding}(\mathbf{U}) = \mathbf{U} + \mathbf{P},
+$$
+
+where $\mathbf{P}$ is constructed from **sinusoidal terms** that encode each column’s position. This enables the Transformer to learn relationships based on both **content** and **relative positions** within the sequence.
+
+---
+
+## 1. What It Does
+
+1. **Inject Ordering**  
+   Without positional encoding, self-attention treats all columns $\mathbf{u}_i$ equally, ignoring their sequence order (e.g., first, second, etc.). By adding position-dependent encodings, each column “knows” its position in the sequence.
+
+2. **Enable Relative Distance Awareness**  
+   The **similarity** between two columns $\mathbf{u}_i$ and $\mathbf{u}_j$ can now depend on their **relative distance** $|i - j|$. This allows the model to learn patterns such as “focus on elements 1 step away” or “focus on elements 5 steps away,” regardless of their absolute positions in the sequence.
+
+3. **Support Generalization**  
+   Because the positional encodings use **sine and cosine functions** at multiple frequencies, the Transformer can apply the **same** relative-distance-based attention strategies to any pair of positions $i, j$, even in sequences longer or shorter than those seen during training.
+
+---
+
+## 2. How It Works
+
+### 2.1 Sinusoidal Vectors per Position
+
+For each position $i = 1,\dots,n$ (i.e., column index) and each dimension index $j$, the **even** entries use sine functions and the **odd** entries use cosine functions with varying wavelengths:
+
+$$
+\mathbf{PE}(i,\,2j) = \sin\!\Bigl(\tfrac{i}{10000^{\,2j/d}}\Bigr), \quad \mathbf{PE}(i,\,2j+1) = \cos\!\Bigl(\tfrac{i}{10000^{\,2j/d}}\Bigr).
+$$
+
+Here, $d$ is the embedding dimension (matching the dimensionality of each $\mathbf{u}_i$), and $j$ ranges from $0$ to $\tfrac{d}{2} - 1$. This setup ensures a **range of frequencies**, allowing the model to capture both fine-grained and broad positional relationships.
+
+### 2.2 Adding PE to the Input Matrix
+
+We construct a positional encoding matrix $\mathbf{P} \in \mathbb{R}^{d \times n}$ by stacking all $\mathbf{PE}(i)$ as columns:
+
+$$
+\mathbf{P} = \bigl[\mathbf{PE}(1),\;\mathbf{PE}(2),\;\dots,\;\mathbf{PE}(n)\bigr].
+$$
+
+The position-enriched input is then:
+
+$$
+\mathbf{U}' = \mathbf{U} + \mathbf{P}.
+$$
+
+Each updated column $\mathbf{u}_i' = \mathbf{u}_i + \mathbf{PE}(i)$ now contains **positional** information alongside the original **content**.
+
+### 2.3 Position-Aware Queries, Keys, and Values
+
+Within the Transformer’s self-attention mechanism, the columns of $\mathbf{U}'$ are linearly projected to form **queries** ($\mathbf{Q}$), **keys** ($\mathbf{K}$), and **values** ($\mathbf{V}$):
+
+$$
+\mathbf{Q} = \mathbf{W}_Q\,\mathbf{U}',\quad \mathbf{K} = \mathbf{W}_K\,\mathbf{U}',\quad \mathbf{V} = \mathbf{W}_V\,\mathbf{U}',
+$$
+
+where $\mathbf{W}_Q$, $\mathbf{W}_K$, and $\mathbf{W}_V$ are learned parameter matrices. Each query $\mathbf{q}_i$ and key $\mathbf{k}_j$ thus incorporate both **content** (from $\mathbf{u}_i$ and $\mathbf{u}_j$) and **positional information** (from $\mathbf{PE}(i)$ and $\mathbf{PE}(j)$).
+
+### 2.4 Relative Distances via Multiplicative Interactions
+
+When computing the attention score between the $i$-th and $j$-th columns, the Transformer uses the dot product of their corresponding queries and keys:
+
+$$
+\alpha_{ij} = \frac{\mathbf{q}_i^\top\,\mathbf{k}_j}{\sqrt{d_k}} = \frac{(\mathbf{W}_Q(\mathbf{u}_i + \mathbf{PE}(i)))^\top\, (\mathbf{W}_K(\mathbf{u}_j + \mathbf{PE}(j)))}{\sqrt{d_k}}.
+$$
+
+Here’s how **relative distance** emerges through **multiplicative interactions**:
+
+- **Phase-Based Multiplicative Interaction encodes relative distance**: The positional encodings $\mathbf{PE}(i)$ and $\mathbf{PE}(j)$ consist of sine and cosine functions with different frequencies. When $\mathbf{q}_i$ and $\mathbf{k}_j$ are multiplied via the dot product, the interaction between their sinusoidal components encodes the **relative distance** $i - j$.
+
+- **Learning Distance-Based Patterns**: Through training, the model learns to associate specific patterns in these phase interactions with meaningful relative distances, enabling it to attend selectively based on how far apart elements are in the sequence.
+
+### 2.5 Generalization Across Positions
+
+The use of multiple frequencies in the sinusoidal positional encodings allows the Transformer to **reuse** the same attention strategies for any pair of positions $i, j$ that share a given relative offset $i - j$. This means the model can **generalize** its learned attention patterns to new sequence lengths and positions, even those not encountered during training.
+
+---
+
+### Conclusion
+
+By defining
+
+$$
+\text{PositionalEncoding}(\mathbf{U}) = \mathbf{U} + \mathbf{P},
+$$
+
+and constructing $\mathbf{P}$ from **sinusoidal** positional vectors, the Transformer effectively incorporates **relative distance** and **ordering** into its self-attention mechanism. The **multiplicative interactions** within the dot product of queries and keys enable the model to discern and leverage **relative positional relationships**, facilitating robust learning and generalization across diverse and varying sequence lengths.
+
+---
+
+## Masking in the Encoder
+
+In Transformer architectures, **masking** controls the flow of information during training. Within the **encoder**, masks primarily address varying sequence lengths and enforce causality, similar to their role in the **decoder**.
+
+### Purpose of Masking
+
+1. **Handling Variable Sequence Lengths:**  
+   Masks prevent the encoder from attending to padding tokens, ensuring that attention mechanisms focus only on meaningful data.
+
+2. **Enforcing Causality:**  
+   Masks restrict attention to previous positions in the sequence, maintaining the temporal order and preventing the model from accessing future information during training.
+
+### Current Application Context
+
+In our **noise suppression** application, all input sequences have a **constant length**, eliminating the immediate need for masking. However, we retain the masking mechanism to support potential future enhancements, such as:
+
+- **Variable-Length Inputs:** Allowing the model to handle audio samples of different durations without structural changes.
+- **Enhanced Feature Integration:** Facilitating the inclusion of additional features that may require selective attention controls.
+
+By maintaining the masking infrastructure, we ensure that the model remains flexible and adaptable to evolving requirements, even though masking is not strictly necessary for the current fixed-length sequence setup.
+
+Certainly! Below is a **concise summary** of the processing pipeline for the **Spectral Transformer**. This overview outlines the key transformation steps from the raw input to the enhanced audio output, highlighting the roles of embedding, positional encoding, the Transformer model, and output projection. Additionally, it emphasizes that both embedding and projection layers are **independently learned** and that masking is maintained for future flexibility.
+
+---
+
+## Processing Pipeline Overview
+
+The **Spectral Transformer** processes audio signals through a series of transformation steps to achieve effective noise suppression. Below is a high-level summary of the entire processing workflow:
+
+1. **Input Representation ($U$):**
+   
+   - **Description:**  
+     The raw audio signal is represented in the frequency domain as a mel-spectrogram matrix:
+     
+     $$
+     U \in \mathbb{R}^{d_U \times n}
+     $$
+     
+     where:
+     - $d_U$ is the **feature dimension** (e.g., mel-frequency bins),
+     - $n$ is the **sequence length** (e.g., number of time frames).
+
+2. **Input Embedding:**
+   
+   - **Transformation:**  
+     The input matrix $U$ is projected into the Transformer's embedding space using a learned linear transformation:
+     
+     $$
+     \text{Embedding}(U) = W_{\text{emb}} \, U
+     $$
+     
+     where $W_{\text{emb}} \in \mathbb{R}^{d \times d_U}$.
+   
+   - **Result:**  
+     $$
+     \text{Embedding}(U) \in \mathbb{R}^{d \times n}
+     $$
+
+3. **Positional Encoding:**
+   
+   - **Transformation:**  
+     Positional information is added to the embedded input to incorporate the order of the sequence elements:
+     
+     $$
+     X = \text{PositionalEncoding}(\text{Embedding}(U)) = \text{Embedding}(U) + \mathbf{P}
+     $$
+     
+     where $\mathbf{P} \in \mathbb{R}^{d \times n}$ contains **sinusoidal positional encodings**.
+   
+   - **Purpose:**  
+     Enables the Transformer to understand the **relative positions** of audio frames, facilitating effective attention mechanisms.
+
+4. **Transformer Processing:**
+   
+   - **Transformation:**  
+     The position-enriched input $X$ is processed through the Transformer model, which consists of multiple encoder layers leveraging **multi-head self-attention** and **feed-forward networks**:
+     
+     $$
+     Y = \text{Transformer}(X)
+     $$
+   
+   - **Result:**  
+     $Y \in \mathbb{R}^{d \times n}$ represents the high-level, context-aware representations of the audio signal.
+
+5. **Output Projection:**
+   
+   - **Transformation:**  
+     The Transformer's output $Y$ is projected back to the original audio feature space using another learned linear transformation:
+     
+     $$
+     \text{OutputProjection}(Y) = W_{\text{out}} \, Y
+     $$
+     
+     where $W_{\text{out}} \in \mathbb{R}^{d_U \times d}$.
+   
+   - **Result:**  
+     $$
+     \text{OutputProjection}(Y) \in \mathbb{R}^{d_U \times n}
+     $$
+     
+     This matrix represents the **enhanced audio signal**, with noise effectively suppressed.
+
+### Key Points:
+
+- **Independent Learned Transformations:**  
+  Both the **Input Embedding** matrix $W_{\text{emb}}$ and the **Output Projection** matrix $W_{\text{out}}$ are **learned independently** during training. There is **no enforced relationship** between them, allowing each layer to optimize its transformation for its specific role in the pipeline.
+
+- **Masking Mechanism:**  
+  Although masking is **not strictly necessary** for this application due to the **constant sequence length** of input audio, the masking infrastructure is **maintained**. This ensures flexibility for potential future modifications, such as handling variable-length inputs or integrating additional features that may require selective attention controls.
+
+### Summary Diagram
+
+Below is a simplified diagram illustrating the processing pipeline:
+
+```
+Input Audio ($U$)
+       |
+       v
+Input Embedding ($\text{Embedding}(U) = W_{\text{emb}} \, U$)
+       |
+       v
+Positional Encoding ($X = \text{Embedding}(U) + \mathbf{P}$)
+       |
+       v
+Transformer ($Y = \text{Transformer}(X)$)
+       |
+       v
+Output Projection ($\text{OutputProjection}(Y) = W_{\text{out}} \, Y$)
+       |
+       v
+Enhanced Audio Output
+```
+
+---
+
+This summary provides a clear and concise overview of the data flow within the **Spectral Transformer**, highlighting the essential transformations and the roles of each component in achieving effective noise suppression.
