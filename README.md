@@ -533,95 +533,84 @@ Certainly! Below is a **concise summary** of the processing pipeline for the **S
 
 ---
 
-## Model Pipeline Overview
+## Model Summary
 
-The **Spectral Transformer** processes audio signals through the following steps:
+The **Spectral Transformer** suppresses audio noise through the following pipeline:
 
-1. **Input Representation ($U$):**
-
-   The raw audio signal is represented in the frequency domain as a mel-spectrogram matrix:
-
+1. **Embedding and Positional Encoding**
+   
    $$
-   U \in \mathbb{R}^{d_U \times n}
+   X=\text{PositionalEncoding}(\text{Embedding}(U))
    $$
 
-   where:
-   - $d_U$ is the **feature dimension** (e.g., mel-frequency bins),
-   - $n$ is the **sequence length** (e.g., number of time frames).
-
-2. **Input Embedding:**
-
-   The input matrix $U$ is projected into the Transformer's embedding space using a learned linear transformation:
-
+2. **Transformer Processing and Output Projection**
+   
    $$
-   \text{Embedding}(U) = W_{\text{emb}} \, U
+   Y=\text{OutputProjection}(\text{Transformer}(X))
    $$
 
-   where $W_{\text{emb}} \in \mathbb{R}^{d \times d_U}$. Thus,
+**Key Points:**
 
-   $$
-   \text{Embedding}(U) \in \mathbb{R}^{d \times n}
-   $$
+- $W_{\text{emb}}$ and $W_{\text{out}}$ are **independently learned**.
+- Masking is included to support future enhancements, such as handling variable-length inputs.
 
-3. **Positional Encoding:**
+## Audio Signal Processing
 
-   Positional information is added to the embedded input to incorporate the sequence order:
+Before feeding raw audio signals into the **Spectral Transformer**, they undergo a carefully designed signal processing pipeline. Each step in this pipeline is tailored to enhance the quality of the data and improve the neural network's performance. By addressing different aspects of the audio signal, these preprocessing steps ensure that the transformer operates on meaningful, well-structured data. The following sections describe each step and its purpose in preparing the signal for effective noise suppression.
 
-   $$
-   X = \text{PositionalEncoding}(\text{Embedding}(U)) = \text{Embedding}(U) + \mathbf{P}
-   $$
+---
 
-   where $\mathbf{P} \in \mathbb{R}^{d \times n}$ contains **sinusoidal positional encodings**.
+### Short-Time Fourier Transform
 
-4. **Transformer Processing:**
+The first step involves applying the [Short-Time Fourier Transform (STFT)](https://en.wikipedia.org/wiki/Short-time_Fourier_transform) to convert the audio signal from the time domain to a sequence of Short Fourier Transforms. This is done using an FFT length of $d_U$ and a modified [Hanning window](https://en.wikipedia.org/wiki/Hann_function):
 
-   The position-enriched input $X$ is processed through the Transformer model:
+$$w(k) = \sin^2\left(\frac{\pi k}{d_U}\right), \quad k \in [1 \dots d_U]$$
 
-   $$
-   Y = \text{Transformer}(X)
-   $$
+Although the first element of this window is not zero, it is still effective due to its smooth tapering, which minimizes spectral leakage. Overlapping windows (with a step size of $\frac{d_U}{2}$) ensure continuity, as the peak value (1) of one window aligns with the zero value of the previous, and the sum of overlapping window values is always 1. This simplifies signal reconstruction (see **Signal Reconstruction** for details).
 
-   where $Y \in \mathbb{R}^{d \times n}$ represents the high-level, context-aware representations.
+The resulting STFT is given by:
 
-5. **Output Projection:**
+$$X_{\mathbb{C}} = \text{stft}(u, w, \text{step} = \frac{d_U}{2})$$
 
-   The Transformer's output $Y$ is projected back to the original audio feature space using another learned linear transformation:
+Here, the subscript $\mathbb{C}$ indicates that the resulting matrix is complex, containing both amplitude and phase information in the frequency domain. For a real input signal, the STFT returns the [DC component](https://en.wikipedia.org/wiki/DC_bias), positive frequencies, and the [Nyquist frequency](https://en.wikipedia.org/wiki/Nyquist_frequency), since negative frequencies are the complex conjugates of positive ones.
 
-   $$
-   \text{OutputProjection}(Y) = W_{\text{out}} \, Y
-   $$
+---
 
-   where $W_{\text{out}} \in \mathbb{R}^{d_U \times d}$. Consequently,
+### Spectrogram
 
-   $$
-   \text{OutputProjection}(Y) \in \mathbb{R}^{d_U \times n}
-   $$
+Since the transformer operates in the power domain, $X_{\mathbb{C}}$ is converted to a spectrogram by taking the squared magnitude of each element:
 
-### Key Points:
+$$X_{P} = \text{spectrogram}(X_{\mathbb{C}})$$
 
-- **Independent Learned Transformations:**  
-  Both the **Input Embedding** matrix $W_{\text{emb}}$ and the **Output Projection** matrix $W_{\text{out}}$ are **learned independently** during training. There is **no enforced relationship** between them, allowing each to optimize its transformation for its specific role.
+Some scaling is applied during this process, depending on the data dimensions, but this is not critical due to subsequent normalization steps.
 
-- **Masking Mechanism:**  
-  Although masking is **not strictly necessary** for this application due to the **constant sequence length**, the masking infrastructure is **maintained** to support potential future modifications, such as handling variable-length inputs or integrating additional features that may require selective attention controls.
+---
 
-### Processing Pipeline Diagram
+### Mel Representation
 
-```
-Input Audio (U)
-       |
-       v
-Input Embedding (Embedding(U) = W_emb * U)
-       |
-       v
-Positional Encoding (X = Embedding(U) + P)
-       |
-       v
-Transformer (Y = Transformer(X))
-       |
-       v
-Output Projection (OutputProjection(Y) = W_out * Y)
-       |
-       v
-Enhanced Audio Output
-```
+Human perception is more sensitive to variations in lower frequencies, making it possible to reduce the dimensionality of the data using a [Mel-frequency scale](https://en.wikipedia.org/wiki/Mel-frequency_cepstrum). In this application, only the Mel filtering step is used, omitting the [Discrete Cosine Transform (DCT)](https://en.wikipedia.org/wiki/Discrete_cosine_transform).
+
+This step involves a simple linear transformation:
+
+$$X_M = dB(M \times X_P), \quad M \in \mathbb{R}^{m \times d_U}, \quad X_M \in \mathbb{R}^{m \times n}$$
+
+A code snippet for constructing the Mel filter matrix $M$ can be found at [Practical Cryptography](http://practicalcryptography.com/miscellaneous/machine-learning/guide-mel-frequency-cepstral-coefficients-mfccs/) and can be easily adapted to Julia.
+
+The function [dB](https://en.wikipedia.org/wiki/Decibel) convert the power level to a logarithmic scale by applying $dB(P)=10 \times log_{10}(P)$ to each element in the matrix.
+
+---
+
+### Power clamping
+
+One issue with the logarithmic representation is that low power levels, that really do not contribute the the audio signal, is represented as large negative number. This can affect the training, since the network tries to learn these instead of the part of the signal that actually mean something. To deal with this, the signal is clamped to be above a threshold, that is defined maximum power level for the signal or the noise, attenuated by 60 dB.
+
+---
+
+### Whitening
+
+The final step before feeding the data to the model is **whitening**, which normalizes the signal by setting its mean to zero and standard deviation to one. This ensures consistent input statistics, improving training stability and convergence. The stored bias and scaling factors are later used to reverse the transformation on the model’s output, allowing correct reconstruction of the enhanced audio.
+
+Whitening helps reduce bias from background noise and enhances model generalization by ensuring the network focuses on patterns rather than variations in magnitude. This step is crucial for reliable performance across diverse audio signals.
+
+$$U=whiten(clamp(X_M))$$
+
