@@ -533,114 +533,95 @@ Certainly! Below is a **concise summary** of the processing pipeline for the **S
 
 ---
 
-## Processing Pipeline Overview
+## Model Pipeline Overview
 
-The **Spectral Transformer** processes audio signals through a series of transformation steps to achieve effective noise suppression. Below is a high-level summary of the entire processing workflow:
+The **Spectral Transformer** processes audio signals through the following steps:
 
 1. **Input Representation ($U$):**
-   
-   - **Description:**  
-     The raw audio signal is represented in the frequency domain as a mel-spectrogram matrix:
-     
-     $$
-     U \in \mathbb{R}^{d_U \times n}
-     $$
-     
-     where:
-     - $d_U$ is the **feature dimension** (e.g., mel-frequency bins),
-     - $n$ is the **sequence length** (e.g., number of time frames).
+
+   The raw audio signal is represented in the frequency domain as a mel-spectrogram matrix:
+
+   $$
+   U \in \mathbb{R}^{d_U \times n}
+   $$
+
+   where:
+   - $d_U$ is the **feature dimension** (e.g., mel-frequency bins),
+   - $n$ is the **sequence length** (e.g., number of time frames).
 
 2. **Input Embedding:**
-   
-   - **Transformation:**  
-     The input matrix $U$ is projected into the Transformer's embedding space using a learned linear transformation:
-     
-     $$
-     \text{Embedding}(U) = W_{\text{emb}} \, U
-     $$
-     
-     where $W_{\text{emb}} \in \mathbb{R}^{d \times d_U}$.
-   
-   - **Result:**  
-     $$
-     \text{Embedding}(U) \in \mathbb{R}^{d \times n}
-     $$
+
+   The input matrix $U$ is projected into the Transformer's embedding space using a learned linear transformation:
+
+   $$
+   \text{Embedding}(U) = W_{\text{emb}} \, U
+   $$
+
+   where $W_{\text{emb}} \in \mathbb{R}^{d \times d_U}$. Thus,
+
+   $$
+   \text{Embedding}(U) \in \mathbb{R}^{d \times n}
+   $$
 
 3. **Positional Encoding:**
-   
-   - **Transformation:**  
-     Positional information is added to the embedded input to incorporate the order of the sequence elements:
-     
-     $$
-     X = \text{PositionalEncoding}(\text{Embedding}(U)) = \text{Embedding}(U) + \mathbf{P}
-     $$
-     
-     where $\mathbf{P} \in \mathbb{R}^{d \times n}$ contains **sinusoidal positional encodings**.
-   
-   - **Purpose:**  
-     Enables the Transformer to understand the **relative positions** of audio frames, facilitating effective attention mechanisms.
+
+   Positional information is added to the embedded input to incorporate the sequence order:
+
+   $$
+   X = \text{PositionalEncoding}(\text{Embedding}(U)) = \text{Embedding}(U) + \mathbf{P}
+   $$
+
+   where $\mathbf{P} \in \mathbb{R}^{d \times n}$ contains **sinusoidal positional encodings**.
 
 4. **Transformer Processing:**
-   
-   - **Transformation:**  
-     The position-enriched input $X$ is processed through the Transformer model, which consists of multiple encoder layers leveraging **multi-head self-attention** and **feed-forward networks**:
-     
-     $$
-     Y = \text{Transformer}(X)
-     $$
-   
-   - **Result:**  
-     $Y \in \mathbb{R}^{d \times n}$ represents the high-level, context-aware representations of the audio signal.
+
+   The position-enriched input $X$ is processed through the Transformer model:
+
+   $$
+   Y = \text{Transformer}(X)
+   $$
+
+   where $Y \in \mathbb{R}^{d \times n}$ represents the high-level, context-aware representations.
 
 5. **Output Projection:**
-   
-   - **Transformation:**  
-     The Transformer's output $Y$ is projected back to the original audio feature space using another learned linear transformation:
-     
-     $$
-     \text{OutputProjection}(Y) = W_{\text{out}} \, Y
-     $$
-     
-     where $W_{\text{out}} \in \mathbb{R}^{d_U \times d}$.
-   
-   - **Result:**  
-     $$
-     \text{OutputProjection}(Y) \in \mathbb{R}^{d_U \times n}
-     $$
-     
-     This matrix represents the **enhanced audio signal**, with noise effectively suppressed.
+
+   The Transformer's output $Y$ is projected back to the original audio feature space using another learned linear transformation:
+
+   $$
+   \text{OutputProjection}(Y) = W_{\text{out}} \, Y
+   $$
+
+   where $W_{\text{out}} \in \mathbb{R}^{d_U \times d}$. Consequently,
+
+   $$
+   \text{OutputProjection}(Y) \in \mathbb{R}^{d_U \times n}
+   $$
 
 ### Key Points:
 
 - **Independent Learned Transformations:**  
-  Both the **Input Embedding** matrix $W_{\text{emb}}$ and the **Output Projection** matrix $W_{\text{out}}$ are **learned independently** during training. There is **no enforced relationship** between them, allowing each layer to optimize its transformation for its specific role in the pipeline.
+  Both the **Input Embedding** matrix $W_{\text{emb}}$ and the **Output Projection** matrix $W_{\text{out}}$ are **learned independently** during training. There is **no enforced relationship** between them, allowing each to optimize its transformation for its specific role.
 
 - **Masking Mechanism:**  
-  Although masking is **not strictly necessary** for this application due to the **constant sequence length** of input audio, the masking infrastructure is **maintained**. This ensures flexibility for potential future modifications, such as handling variable-length inputs or integrating additional features that may require selective attention controls.
+  Although masking is **not strictly necessary** for this application due to the **constant sequence length**, the masking infrastructure is **maintained** to support potential future modifications, such as handling variable-length inputs or integrating additional features that may require selective attention controls.
 
-### Summary Diagram
-
-Below is a simplified diagram illustrating the processing pipeline:
+### Processing Pipeline Diagram
 
 ```
-Input Audio ($U$)
+Input Audio (U)
        |
        v
-Input Embedding ($\text{Embedding}(U) = W_{\text{emb}} \, U$)
+Input Embedding (Embedding(U) = W_emb * U)
        |
        v
-Positional Encoding ($X = \text{Embedding}(U) + \mathbf{P}$)
+Positional Encoding (X = Embedding(U) + P)
        |
        v
-Transformer ($Y = \text{Transformer}(X)$)
+Transformer (Y = Transformer(X))
        |
        v
-Output Projection ($\text{OutputProjection}(Y) = W_{\text{out}} \, Y$)
+Output Projection (OutputProjection(Y) = W_out * Y)
        |
        v
 Enhanced Audio Output
 ```
-
----
-
-This summary provides a clear and concise overview of the data flow within the **Spectral Transformer**, highlighting the essential transformations and the roles of each component in achieving effective noise suppression.
