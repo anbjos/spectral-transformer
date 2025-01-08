@@ -401,9 +401,6 @@ This creates a matrix $\mathbf{P}$ where each column represents a token’s posi
 ---
 
 ### Why It Works
-Below is the **column-based** explanation of why the dot product between two positional encoding vectors depends on the **difference** in their indices, with all equations on single lines and no extra spaces at their boundaries.
-
----
 
 ## 1. Column Construction (Position as Column Index)
 
@@ -439,7 +436,7 @@ $$\cos\bigl(\tfrac{j}{\alpha_k}-\tfrac{j'}{\alpha_k}\bigr)=\cos\Bigl(\tfrac{j-j'
 
 Summing across all frequencies $\alpha_k$ yields terms of the form $\cos\bigl(\tfrac{j-j'}{\alpha_k}\bigr)$. Hence, the dot product depends on the difference $(j-j')$:
 
-$$\mathbf{p}_j^\top\mathbf{p}_{j'} = \sum_{k}\cos\Bigl(\tfrac{j-j'}{\alpha_k}\Bigr).$$
+$$\mathbf{p}_j \mathbf{p}_{j'} = \sum_{k}\cos\Bigl(\frac{j-j'}{\alpha_k}\Bigr).$$
 
 Because this expression depends only on $(j-j')$ and **not** on $j$ or $j'$ separately, it encodes the **relative distance** between these two positions in the sequence.
 
