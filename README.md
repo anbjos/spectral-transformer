@@ -4,6 +4,8 @@ The **Spectral Transformer** repository demonstrates the versatility of transfor
 
 A key highlight is the integration of neural networks and digital signal processing (DSP) techniques. The results showcase the synergy of these approaches, achieving precise noise suppression while maintaining the **original signal's phase information**. Notably, this approach avoids the use of [vocoders](https://en.wikipedia.org/wiki/Phase_vocoder) for audio reconstruction, ensuring higher fidelity in the output.
 
+## Results
+
 Even with a relatively simple transformer network, excellent performance can be achieved in real-world scenarios, as illustrated by the following example. Using the challenging task of separating human speech from background noise (e.g., frog sounds), the network demonstrates its robustness. Specifically:
 
 1. **Signal with Noise** (Figure 1): This represents the input noisy speech signal, containing both human speech and frog sounds.
@@ -21,19 +23,22 @@ Even with a relatively simple transformer network, excellent performance can be 
 ![Cleaned signal with noise](figures/result.png)
 ![Listen to result](https://github.com/anbjos/spectral-transformer/blob/main/figures/result.wav) (Choose "Download Raw" to hear the audio)
 
+## Transformer
 
-## Attention Mechanism
-Understanding the [attention mechanism](https://arxiv.org/html/1706.03762v7) is crucial for adapting deep learning architectures to various input formats. While most explanations utilize a sequence × embedding input format, this discussion emphasizes the embedding × sequence format as implemented in [Julia](https://julialang.org/). Additionally, this documentation aims to provide a comprehensive overview of the concepts that may initially seem challenging, breaking them down in a clear and accessible manner. By doing so, it not only facilitates modifications to input/output processing but also ensures the provided code is both intuitive and adaptable.
+This section presents a textbook description of the Transformer, which may be skipped by those already familiar with the concept. It provides a matrix representation aligned with the Julia format, where inputs are arranged as $inputs \times sequence$, unlike formats used in the [Attention Is All You Need](https://arxiv.org/html/1706.03762v7) paper. Additionally, it lays the groundwork for modifications needed to handle audio data instead of text, with the implementation following this structure.
+
+
+### Attention Mechanism
 
 The attention mechanism is a foundational concept in modern deep learning architectures, such as the Transformer. It enables models to focus on specific elements of an input sequence when generating an output, capturing the relationships between elements of the sequence. This section provides a step-by-step explanation of how the attention mechanism operates for **a single attention head**, starting with input representation as matrices, followed by transformations into **queries (Q)**, **keys (K)**, and **values (V)**—all of which are *learned* representations rather than direct input data. The similarities between **Q** and **K** are then measured using a dot product, yielding weights that indicate how relevant each position is relative to the current query. These weights are subsequently applied to **V**, allowing the model to focus on and aggregate information from different parts of the sequence. Each step is described in terms of the matrix operations that underlie the mechanism.
 
 ---
 
-### 1. **Input Representation as a Matrix**
+### 1. Input Representation as a Matrix
 
 The input sequence is represented as a matrix:
 
-Let the sequence have $n$ elements, each represented by a vector of dimension $d$. The input sequence is then represented as:
+Let the sequence have $n$ elements, each represented by a vector of dimension $d$. The input sequence to the attention head is then represented as:
 
 $$
 X \in \mathbb{R}^{d \times n}
@@ -43,7 +48,7 @@ where each column corresponds to the representation of an element in the sequenc
 
 ---
 
-### 2. **Linear Transformations to Obtain Query, Key, and Value**
+### 2. Linear Transformations to Obtain Query, Key, and Value
 
 Each element of the input sequence is transformed into three separate representations: **query ($Q$)**, **key ($K$)**, and **value ($V$)** using weight matrices:
 
@@ -72,7 +77,7 @@ After the transformations:
 
 ---
 
-### 3. **Attention Score Calculation**
+### 3. Attention Score Calculation
 
 The attention mechanism determines the relevance of each element in the sequence to every other element. This is done by computing a **similarity** score between queries and keys using a [dot product](https://en.wikipedia.org/wiki/Dot_product):
 
@@ -100,7 +105,7 @@ $$
 
 ---
 
-### 4. **Softmax to Compute Attention Weights**
+### 4. Softmax to Compute Attention Weights
 
 The [softmax](https://en.wikipedia.org/wiki/Softmax_function) function is applied row-wise to the scaled attention scores to produce attention weights, ensuring that each row forms a probability distribution that sums to 1:
 
@@ -118,7 +123,7 @@ This results in the attention weights matrix $A \in \mathbb{R}^{n \times n}$, wh
 
 ---
 
-### 5. **Weighted Sum Using Values**
+### 5. Weighted Sum Using Values
 
 The attention weights are used to compute a weighted sum of the value vectors:
 
@@ -183,7 +188,7 @@ $$
 where $O_i \in \mathbb{R}^{d_v \times n}$ represents the output from the $i$-th attention head. To integrate these outputs, the results from all heads are stacked vertically into a single matrix:
 
 $$
-O_{\text{combined}} = 
+O_{\text{MultiHead}} = 
 \begin{bmatrix}
 O_1 \\
 O_2 \\
@@ -208,7 +213,7 @@ where:
 - $h$ is the number of attention heads,
 - $d_v$ is the feature dimension of each head.
 
-This constraint ensures that the combined matrix $O_{\text{combined}}$ has a total of $d$ rows, regardless of how many heads are used. As the number of heads increases, the dimension of each head’s output ($d_v$) must decrease proportionally. This tradeoff balances the model's ability to focus on diverse features across heads with the capacity of individual heads to represent detailed patterns.
+This constraint ensures that the combined matrix $O_{\text{MultiHead}}$ has a total of $d$ rows, regardless of how many heads are used. As the number of heads increases, the dimension of each head’s output ($d_v$) must decrease proportionally. This tradeoff balances the model's ability to focus on diverse features across heads with the capacity of individual heads to represent detailed patterns.
 
 By stacking attention outputs in this way, multi-head attention integrates diverse insights from the input data while preserving a structured and scalable approach to feature representation.
 
@@ -222,7 +227,13 @@ The Transformer architecture, introduced in the paper [*Attention Is All You Nee
 The first add and norm layer integrates the output of the multi-head attention mechanism back into the network. Multi-head attention can be represented as a function:
 
 $$
-\text{MultiHeadAttention}(X)
+Y=\text{MultiHeadAttention}(X)
+$$
+
+Here $X,Y,Z$ represent inputs to functions and
+
+$$
+X\in \mathbb{R}^{d \times n},Y\in \mathbb{R}^{d \times n}, Z\in \mathbb{R}^{d \times n}
 $$
 
 This function processes the input \( X \) through attention heads and combines their outputs into a single representation.
@@ -238,13 +249,13 @@ $$
 2. **Layer Normalization**: [Normalizes](https://en.wikipedia.org/wiki/Normalization_(machine_learning)#Layer_normalization) the combined result for stability:
 
 $$
-Z = \text{LayerNorm}(Y)
+Y = \text{LayerNorm}(X)
 $$
 
-This operation can be written concisely as:
+Combining these into one function provide:
 
 $$
-Z = \text{LayerNorm}(X + \text{MultiHeadAttention}(X))
+FirstNormalization(X) = \text{LayerNorm}(X + \text{MultiHeadAttention}(X))
 $$
 
 It ensures stable gradients and prepares the output for further processing.
@@ -256,7 +267,7 @@ The feed-forward layer processes the normalized output $Z$ with two linear trans
 1. **Linear Transformation and Activation**:
 
 $$
-H = \text{ReLU}(W_1 Z + b_1)
+Y = \text{ReLU}(W_1 X + b_1)
 $$
 
 where $W_1 \in \mathbb{R}^{d_\text{ffn} \times d}$ and $b_1 \in \mathbb{R}^{d_\text{ffn}}$. Typically, $d_\text{ffn}$ is set to **4 times** the input dimension $d$, allowing the layer to model more complex interactions.
@@ -264,59 +275,32 @@ where $W_1 \in \mathbb{R}^{d_\text{ffn} \times d}$ and $b_1 \in \mathbb{R}^{d_\t
 2. **Second Linear Transformation**:
 
 $$
-F = W_2 H + b_2
+Y = W_2 X + b_2
 $$
 
 where $W_2 \in \mathbb{R}^{d \times d_\text{ffn}}$ and $b_2 \in \mathbb{R}^d$. This transformation reduces the dimension back to $d$, ensuring the output size remains consistent with the original input.
 
-Finally, the result is integrated using another add and norm layer:
+Combining these provides:
 
 $$
-\text{Output}_{\text{Attention Layer}} = \text{LayerNorm}(Z + F)
+FeedForwardLayer(X) = W_2 (\text{ReLU}(W_1 X + b_1)) + b_2
 $$
 
 **Why increase and then decrease the dimension?**  
 Increasing the dimension to $d_\text{ffn}$ (typically $4d$) enables the model to capture richer and more complex features in a higher-dimensional space. Reducing the dimension back to $d$ ensures the output remains manageable and compatible with the rest of the architecture, while still benefiting from the complex intermediate representations.
 
----
-
-### Summary of Attention Layer
-
-1. **Multi-Head Attention**:
+Finally, the result is integrated using another add and norm layer. The complete chain can be written:
 
 $$
-\text{MultiHeadAttention}(X) = \text{Concat}(O_1, \dots, O_h) W_O, \quad O_i = \text{Softmax}\left(\frac{K_i^T Q_i}{\sqrt{d_k}}\right) V_i
+Z=FirstNormalization(X)\\
+Y = LayerNorm(FeedForwardLayer(Z)+Z)
 $$
-
-2. **Add and Norm**:
-
-$$
-Z = \text{LayerNorm}(X + \text{MultiHeadAttention}(X))
-$$
-
-3. **Feed-Forward**:
-
-$$
-F = \text{ReLU}(W_1 Z + b_1) W_2 + b_2
-$$
-
-4. **Second Add and Norm**:
-
-$$
-\text{Output}_{\text{Attention Layer}} = \text{LayerNorm}(X + F)
-$$
-
-The final output, $Output_{\text{Attention Layer}}$, represents the result of processing through the attention layer, integrating multi-head attention and feed-forward operations.
 
 ---
 
 ## Transformer Block
 
 The system considered here is an **encoder**, composed of $N$ stacked **Transformer attention layers**, each integrating multi-head attention, feed-forward layers, and add and norm operations. These layers process input sequences into high-dimensional representations, making the encoder suitable for tasks like classification, sound processing, or summarization.
-
----
-
-### Encoder and Decoder in the Original Transformer
 
 The original Transformer architecture, as introduced in [*Attention Is All You Need*](https://arxiv.org/html/1706.03762v7), included both an encoder and a decoder:
 
@@ -363,15 +347,11 @@ In our **noise suppression** application, we operate on **audio signals in the f
 
 Before passing $U$ into the Transformer, we apply an **Input Embedding** step that projects $U$ to the model’s embedding dimension $d$ using a linear layer:
 
-$$
-\text{Embedding}(U) = W_{\text{emb}} \, U,
-$$
+$$\text{Embedding}(U) = W_{\text{emb}} U,$$
 
 where $W_{\text{emb}} \in \mathbb{R}^{d \times d_U}$. Thus,
 
-$$
-\text{Embedding}(U) \in \mathbb{R}^{d \times n}.
-$$
+$$\text{Embedding}(U) \in \mathbb{R}^{d \times n}.$$
 
 Each column of $\text{Embedding}(U)$ represents a sequence element, enabling the Transformer to process the audio data effectively.
 
@@ -379,15 +359,11 @@ Each column of $\text{Embedding}(U)$ represents a sequence element, enabling the
 
 After the Transformer processes the embedded features, we convert the output back to the original audio feature space through an **Output Projection** step, implemented as another linear layer:
 
-$$
-\text{OutputProjection}(Y) = W_{\text{out}} \, Y,
-$$
+$$\text{OutputProjection}(Y) = W_{\text{out}} Y,$$
 
 where $W_{\text{out}} \in \mathbb{R}^{d_U \times d}$ and $Y \in \mathbb{R}^{d \times n}$. Consequently,
 
-$$
-\text{OutputProjection}(Y) \in \mathbb{R}^{d_U \times n}.
-$$
+$$\text{OutputProjection}(Y) \in \mathbb{R}^{d_U \times n}.$$
 
 ### Independent Learned Transformations
 
@@ -396,117 +372,88 @@ Both the **Input Embedding** matrix $W_{\text{emb}}$ and the **Output Projection
 - **Input Embedding ($W_{\text{emb}}$):** Projects raw audio features into the Transformer's embedding space.
 - **Output Projection ($W_{\text{out}}$):** Maps the Transformer's output back to the original audio feature space.
 
-### Summary
-
-In this noise suppression system:
-
-- **Input Embedding:** Transforms frequency-domain audio features into the Transformer's embedding space via a learned linear layer.
-- **Output Projection:** Converts the Transformer's output back to the original audio feature space through a separate learned linear layer.
-
-Both embeddings are **independently learned**, ensuring optimal transformations for noise suppression without imposed constraints.
 
 ---
 
 ## Positional Encoding
-
-The Transformer views its input matrix $\mathbf{U}$ as consisting of **columns** that represent elements in a sequence:
-
-$$
-\mathbf{U} = \bigl[\mathbf{u}_1,\;\mathbf{u}_2,\;\dots,\;\mathbf{u}_n\bigr].
-$$
-
-By default, the dot-product self-attention mechanism has **no inherent sense** of the order of these columns within the sequence. To introduce this ordering information, we define the positional encoding as a function:
-
-$$
-\text{PositionalEncoding}(\mathbf{U}) = \mathbf{U} + \mathbf{P},
-$$
-
-where $\mathbf{P}$ is constructed from **sinusoidal terms** that encode each column’s position. This enables the Transformer to learn relationships based on both **content** and **relative positions** within the sequence.
+Here is the revised text with all equations marked appropriately:
 
 ---
 
-## 1. What It Does
+### Calculation
+The positional encoding $\text{PE}(i, j)$ is defined for each embedding dimension $i$ and token position $j$ as:
 
-1. **Inject Ordering**  
-   Without positional encoding, self-attention treats all columns $\mathbf{u}_i$ equally, ignoring their sequence order (e.g., first, second, etc.). By adding position-dependent encodings, each column “knows” its position in the sequence.
+$$
+\text{PE}(i, j) =
+\begin{cases}
+\sin\left(\frac{j}{10000^{i/d}}\right), & \text{if } i \text{ is even}, \\
+\cos\left(\frac{j}{10000^{(i-1)/d}}\right), & \text{if } i \text{ is odd}.
+\end{cases}
+$$
 
-2. **Enable Relative Distance Awareness**  
-   The **similarity** between two columns $\mathbf{u}_i$ and $\mathbf{u}_j$ can now depend on their **relative distance** $|i - j|$. This allows the model to learn patterns such as “focus on elements 1 step away” or “focus on elements 5 steps away,” regardless of their absolute positions in the sequence.
+Here:
+- $j$ is the token's position in the sequence.
+- $i$ is the embedding dimension index.
+- $d$ is the embedding dimensionality.
 
-3. **Support Generalization**  
-   Because the positional encodings use **sine and cosine functions** at multiple frequencies, the Transformer can apply the **same** relative-distance-based attention strategies to any pair of positions $i, j$, even in sequences longer or shorter than those seen during training.
+This creates a matrix $\mathbf{P}$ where each column represents a token’s positional encoding.
 
 ---
 
-## 2. How It Works
-
-### 2.1 Sinusoidal Vectors per Position
-
-For each position $i = 1,\dots,n$ (i.e., column index) and each dimension index $j$, the **even** entries use sine functions and the **odd** entries use cosine functions with varying wavelengths:
-
-$$
-\mathbf{PE}(i,\,2j) = \sin\!\Bigl(\tfrac{i}{10000^{\,2j/d}}\Bigr), \quad \mathbf{PE}(i,\,2j+1) = \cos\!\Bigl(\tfrac{i}{10000^{\,2j/d}}\Bigr).
-$$
-
-Here, $d$ is the embedding dimension (matching the dimensionality of each $\mathbf{u}_i$), and $j$ ranges from $0$ to $\tfrac{d}{2} - 1$. This setup ensures a **range of frequencies**, allowing the model to capture both fine-grained and broad positional relationships.
-
-### 2.2 Adding PE to the Input Matrix
-
-We construct a positional encoding matrix $\mathbf{P} \in \mathbb{R}^{d \times n}$ by stacking all $\mathbf{PE}(i)$ as columns:
-
-$$
-\mathbf{P} = \bigl[\mathbf{PE}(1),\;\mathbf{PE}(2),\;\dots,\;\mathbf{PE}(n)\bigr].
-$$
-
-The position-enriched input is then:
-
-$$
-\mathbf{U}' = \mathbf{U} + \mathbf{P}.
-$$
-
-Each updated column $\mathbf{u}_i' = \mathbf{u}_i + \mathbf{PE}(i)$ now contains **positional** information alongside the original **content**.
-
-### 2.3 Position-Aware Queries, Keys, and Values
-
-Within the Transformer’s self-attention mechanism, the columns of $\mathbf{U}'$ are linearly projected to form **queries** ($\mathbf{Q}$), **keys** ($\mathbf{K}$), and **values** ($\mathbf{V}$):
-
-$$
-\mathbf{Q} = \mathbf{W}_Q\,\mathbf{U}',\quad \mathbf{K} = \mathbf{W}_K\,\mathbf{U}',\quad \mathbf{V} = \mathbf{W}_V\,\mathbf{U}',
-$$
-
-where $\mathbf{W}_Q$, $\mathbf{W}_K$, and $\mathbf{W}_V$ are learned parameter matrices. Each query $\mathbf{q}_i$ and key $\mathbf{k}_j$ thus incorporate both **content** (from $\mathbf{u}_i$ and $\mathbf{u}_j$) and **positional information** (from $\mathbf{PE}(i)$ and $\mathbf{PE}(j)$).
-
-### 2.4 Relative Distances via Multiplicative Interactions
-
-When computing the attention score between the $i$-th and $j$-th columns, the Transformer uses the dot product of their corresponding queries and keys:
-
-$$
-\alpha_{ij} = \frac{\mathbf{q}_i^\top\,\mathbf{k}_j}{\sqrt{d_k}} = \frac{(\mathbf{W}_Q(\mathbf{u}_i + \mathbf{PE}(i)))^\top\, (\mathbf{W}_K(\mathbf{u}_j + \mathbf{PE}(j)))}{\sqrt{d_k}}.
-$$
-
-Here’s how **relative distance** emerges through **multiplicative interactions**:
-
-- **Phase-Based Multiplicative Interaction encodes relative distance**: The positional encodings $\mathbf{PE}(i)$ and $\mathbf{PE}(j)$ consist of sine and cosine functions with different frequencies. When $\mathbf{q}_i$ and $\mathbf{k}_j$ are multiplied via the dot product, the interaction between their sinusoidal components encodes the **relative distance** $i - j$.
-
-- **Learning Distance-Based Patterns**: Through training, the model learns to associate specific patterns in these phase interactions with meaningful relative distances, enabling it to attend selectively based on how far apart elements are in the sequence.
-
-### 2.5 Generalization Across Positions
-
-The use of multiple frequencies in the sinusoidal positional encodings allows the Transformer to **reuse** the same attention strategies for any pair of positions $i, j$ that share a given relative offset $i - j$. This means the model can **generalize** its learned attention patterns to new sequence lengths and positions, even those not encountered during training.
+### Why It Works
+Below is the **column-based** explanation of why the dot product between two positional encoding vectors depends on the **difference** in their indices, with all equations on single lines and no extra spaces at their boundaries.
 
 ---
 
-### Conclusion
+## 1. Column Construction (Position as Column Index)
 
-By defining
+Assume the positional encoding matrix $\mathbf{P}$ has:
+- **$d$ rows** (each row corresponds to a dimension of the embedding),
+- **$n$ columns** (each column corresponds to a position $j$ in the sequence).
 
-$$
-\text{PositionalEncoding}(\mathbf{U}) = \mathbf{U} + \mathbf{P},
-$$
+For position $j$, the column $\mathbf{p}_j$ looks like
 
-and constructing $\mathbf{P}$ from **sinusoidal** positional vectors, the Transformer effectively incorporates **relative distance** and **ordering** into its self-attention mechanism. The **multiplicative interactions** within the dot product of queries and keys enable the model to discern and leverage **relative positional relationships**, facilitating robust learning and generalization across diverse and varying sequence lengths.
+$$\mathbf{p}_j = \bigl[\sin\bigl(\tfrac{j}{\alpha_0}\bigr),\,\cos\bigl(\tfrac{j}{\alpha_0}\bigr),\,\sin\bigl(\tfrac{j}{\alpha_1}\bigr),\,\cos\bigl(\tfrac{j}{\alpha_1}\bigr),\,\dots\bigr]^\top$$
+
+where each $\alpha_k$ (often $10000^{k/d}$) controls the wavelength of the $k$-th sine/cosine pair.
 
 ---
+
+## 2. Dot Product Involves Sine-Cosine Products
+
+To compute the dot product between two columns $\mathbf{p}_j$ and $\mathbf{p}_{j'}$ (positions $j$ and $j'$), we pairwise multiply elements and sum them:
+
+$$\mathbf{p}_j^\top\mathbf{p}_{j'} = \sum_{k\in\text{(sine/cos pairs)}}\bigl[\sin\bigl(\tfrac{j}{\alpha_k}\bigr)\sin\bigl(\tfrac{j'}{\alpha_k}\bigr) + \cos\bigl(\tfrac{j}{\alpha_k}\bigr)\cos\bigl(\tfrac{j'}{\alpha_k}\bigr)\bigr].$$
+
+Using the trigonometric identity
+
+$$\sin(A)\sin(B)+\cos(A)\cos(B)=\cos(A-B),$$
+
+each sine-cosine pair becomes
+
+$$\cos\bigl(\tfrac{j}{\alpha_k}-\tfrac{j'}{\alpha_k}\bigr)=\cos\Bigl(\tfrac{j-j'}{\alpha_k}\Bigr).$$
+
+---
+
+## 3. Dependence on $(j-j')$
+
+Summing across all frequencies $\alpha_k$ yields terms of the form $\cos\bigl(\tfrac{j-j'}{\alpha_k}\bigr)$. Hence, the dot product depends on the difference $(j-j')$:
+
+$$\mathbf{p}_j^\top\mathbf{p}_{j'} = \sum_{k}\cos\Bigl(\tfrac{j-j'}{\alpha_k}\Bigr).$$
+
+Because this expression depends only on $(j-j')$ and **not** on $j$ or $j'$ separately, it encodes the **relative distance** between these two positions in the sequence.
+
+---
+
+## 4. Why This Matters
+
+- **Relative Position Encoding**: Since $\mathbf{p}_j^\top\mathbf{p}_{j'}$ is a function of $(j-j')$, the model inherently captures how far apart two positions are.
+
+- **Multi-Scale Representation**: Each frequency $\alpha_k$ contributes a different periodicity, enabling both **local** and **global** positional differences to be represented.
+
+- **Generalization**: Because the encoding is based on sinusoids, a transformer can handle **varying sequence lengths** and still interpret relative positions consistently, even for positions not seen during training.
+
+By aligning each **column** with a position $j$ in the sequence, we see that the **dot product** between columns depends on $(j-j')$. This emerges from the trigonometric identities that convert products of sine and cosine terms into functions of **phase differences**, effectively encoding **relative** positional information.---
 
 ## Masking in the Encoder
 
@@ -524,12 +471,10 @@ In Transformer architectures, **masking** controls the flow of information durin
 
 In our **noise suppression** application, all input sequences have a **constant length**, eliminating the immediate need for masking. However, we retain the masking mechanism to support potential future enhancements, such as:
 
-- **Variable-Length Inputs:** Allowing the model to handle audio samples of different durations without structural changes.
+- **Variable-Length Inputs:** Allowing the model to handle audio samples of different duration's without structural changes.
 - **Enhanced Feature Integration:** Facilitating the inclusion of additional features that may require selective attention controls.
 
 By maintaining the masking infrastructure, we ensure that the model remains flexible and adaptable to evolving requirements, even though masking is not strictly necessary for the current fixed-length sequence setup.
-
-Certainly! Below is a **concise summary** of the processing pipeline for the **Spectral Transformer**. This overview outlines the key transformation steps from the raw input to the enhanced audio output, highlighting the roles of embedding, positional encoding, the Transformer model, and output projection. Additionally, it emphasizes that both embedding and projection layers are **independently learned** and that masking is maintained for future flexibility.
 
 ---
 
