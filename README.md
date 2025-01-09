@@ -410,30 +410,11 @@ Because this expression depends only on $(j-j')$ and **not** on $j$ or $j'$ sepa
 
 ---
 
-## Masking in the Encoder
-
-### Purpose of Masking
-
-1. Handling Variable Sequence Lengths:  
-   Masks prevent the encoder from attending to padding tokens, ensuring that attention mechanisms focus only on meaningful data.
-
-2. Enforcing Causality:  
-   Masks restrict attention to previous positions in the sequence, maintaining the temporal order and preventing the model from accessing future information during training.
-
-### Current Application Context
-
-In our **noise suppression** application, all input sequences have a **constant length**, eliminating the immediate need for masking. However, we retain the masking mechanism to support potential future enhancements, such as:
-
-- **Variable-Length Inputs:** Allowing the model to handle audio samples of different duration's without structural changes.
-- **Enhanced Feature Integration:** Facilitating the inclusion of additional features that may require selective attention controls.
-
-By maintaining the masking infrastructure, we ensure that the model remains flexible and adaptable to evolving requirements, even though masking is not strictly necessary for the current fixed-length sequence setup.
-
-## Masking in the Encoder
+### Masking in the Encoder
 
 In Transformer architectures, **masking** controls the flow of information during training. Within the **encoder**, masks primarily address varying sequence lengths and enforce causality, similar to their role in the **decoder**.
 
-### Purpose of Masking
+#### Purpose of Masking
 
 1. **Handling Variable Sequence Lengths:**  
    Masks prevent the encoder from attending to padding tokens, ensuring that attention mechanisms focus only on meaningful data.
@@ -441,7 +422,7 @@ In Transformer architectures, **masking** controls the flow of information durin
 2. **Enforcing Causality:**  
    Masks restrict attention to previous positions in the sequence, maintaining the temporal order and preventing the model from accessing future information during training.
 
-### Current Application Context
+#### Current Application Context
 
 In our **noise suppression** application, all input sequences have a **constant length**, eliminating the immediate need for masking. However, we retain the masking mechanism to support potential future enhancements, such as:
 
@@ -452,26 +433,42 @@ By maintaining the masking infrastructure, we ensure that the model remains flex
 
 ---
 
-## Model Summary
+### Model Summary
 
 The **Spectral Transformer** suppresses audio noise through the following pipeline:
 
-1. **Embedding and Positional Encoding**
-   
-   $$
-   X=\text{PositionalEncoding}(\text{Embedding}(U))
-   $$
+1. **Embedding and Positional Encoding**  
+$$X=\text{PositionalEncoding}(\text{Embedding}(U))$$
 
-2. **Transformer Processing and Output Projection**
-   
-   $$
-   Y=\text{OutputProjection}(\text{Transformer}(X))
-   $$
+2. **Transformer Processing and Output Projection**  
+$$Y=\text{OutputProjection}(\text{Transformer}(X))$$
 
-**Key Points:**
+The corresponding model definition from the implementation is shown below:
 
-- $W_{\text{emb}}$ and $W_{\text{out}}$ are **independently learned**.
-- Masking is included to support future enhancements, such as handling variable-length inputs.
+```julia
+struct Model
+    position_embedding
+    projection
+    withmask 
+    transformer
+    antiprojection
+end
+ 
+model = Model(position_embedding, projection_layer, withmask, encoding_transformer, antiprojection_layer)
+@functor Model (projection, transformer, antiprojection)
+
+function (model::Model)(input)
+    position = model.position_embedding(input.hidden_state)
+    projection = model.projection(input.hidden_state)
+    transformed = model.transformer((hidden_state = projection .+ position, attention_mask = input.attention_mask))
+    result = (hidden_state = model.antiprojection(transformed.hidden_state), attention_mask = transformed.attention_mask)
+    return result
+end
+```
+
+Within the **Transformer.jl** framework, signals between blocks are represented as tuples. Specifically, the framework uses a `hidden_state` field to represent the actual data and an `attention_mask`. In this application, masking is included to support future enhancements, such as handling variable-length inputs.
+
+The `@functor` macro is used in this framework to expose learnable weights for automatic differentiation during training.
 
 ## Audio Signal Processing
 
