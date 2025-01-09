@@ -28,13 +28,11 @@ Even with a relatively simple transformer network, excellent performance can be 
 This section presents a textbook description of the Transformer, which may be skipped by those already familiar with the concept. It provides a matrix representation aligned with the Julia format, where inputs are arranged as $inputs \times sequence$, unlike formats used in the [Attention Is All You Need](https://arxiv.org/html/1706.03762v7) paper. Additionally, it lays the groundwork for modifications needed to handle audio data instead of text, with the implementation following this structure.
 
 
-### Attention Mechanism
+### Attention Head
 
 The attention mechanism is a foundational concept in modern deep learning architectures, such as the Transformer. It enables models to focus on specific elements of an input sequence when generating an output, capturing the relationships between elements of the sequence. This section provides a step-by-step explanation of how the attention mechanism operates for **a single attention head**, starting with input representation as matrices, followed by transformations into **queries (Q)**, **keys (K)**, and **values (V)**—all of which are *learned* representations rather than direct input data. The similarities between **Q** and **K** are then measured using a dot product, yielding weights that indicate how relevant each position is relative to the current query. These weights are subsequently applied to **V**, allowing the model to focus on and aggregate information from different parts of the sequence. Each step is described in terms of the matrix operations that underlie the mechanism.
 
----
-
-### 1. Input Representation as a Matrix
+#### 1. Input Representation as a Matrix
 
 The input sequence is represented as a matrix:
 
@@ -46,9 +44,7 @@ $$
 
 where each column corresponds to the representation of an element in the sequence.
 
----
-
-### 2. Linear Transformations to Obtain Query, Key, and Value
+#### 2. Linear Transformations to Obtain Query, Key, and Value
 
 Each element of the input sequence is transformed into three separate representations: **query ($Q$)**, **key ($K$)**, and **value ($V$)** using weight matrices:
 
@@ -75,9 +71,7 @@ After the transformations:
 - $K \in \mathbb{R}^{d_k \times n}$,
 - $V \in \mathbb{R}^{d_v \times n}$.
 
----
-
-### 3. Attention Score Calculation
+#### 3. Attention Score Calculation
 
 The attention mechanism determines the relevance of each element in the sequence to every other element. This is done by computing a **similarity** score between queries and keys using a [dot product](https://en.wikipedia.org/wiki/Dot_product):
 
@@ -103,9 +97,7 @@ $$
 \text{Scaled Attention Score} = \frac{K^T Q}{\sqrt{d_k}}
 $$
 
----
-
-### 4. Softmax to Compute Attention Weights
+#### 4. Softmax to Compute Attention Weights
 
 The [softmax](https://en.wikipedia.org/wiki/Softmax_function) function is applied row-wise to the scaled attention scores to produce attention weights, ensuring that each row forms a probability distribution that sums to 1:
 
@@ -121,9 +113,7 @@ $$
 
 This results in the attention weights matrix $A \in \mathbb{R}^{n \times n}$, where each row represents how much each key contributes to the respective query.
 
----
-
-### 5. Weighted Sum Using Values
+#### 5. Weighted Sum Using Values
 
 The attention weights are used to compute a weighted sum of the value vectors:
 
@@ -144,34 +134,12 @@ $$
 which is the output of the attention mechanism.
 
 ---
+### Explanation Summary
 
-### Summary
+The attention mechanism identifies and amplifies important relationships between sequence elements. For example, if the first and third column in $X$ have high similarity (as measured by the dot product), the attention score $S_{1,3}$ will be large. After applying softmax, this results in a high weight $A_{1,3}$, causing the third column in $V$ to contribute significantly to the first column in $O$.
 
-In terms of matrix operations:
+The weight matrices $W_Q$, $W_K$, and $W_V$ are learned during training and independently transform each input column into corresponding columns of queries, keys, and values. This enables the model to capture the necessary relationships for effective task performance.
 
-1. Compute query, key, and value matrices:
-
-$$
-Q = W_Q X, \quad K = W_K X, \quad V = W_V X
-$$
-
-2. Compute attention scores:
-
-$$
-S = \frac{K^T Q}{\sqrt{d_k}}
-$$
-
-3. Apply softmax to scores to get attention weights:
-
-$$
-A = \text{Softmax}(S)
-$$
-
-4. Compute the output as a weighted sum of values:
-
-$$
-O = V A
-$$
 
 ## Multi-Head Attention Mechanism
 
