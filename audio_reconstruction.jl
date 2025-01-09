@@ -229,7 +229,7 @@ for p in 1:size(XX,2)
     clamp!(att, 0, 1)
     att=sqrt.(att)
 
-    aa[:,p]=att
+    #aa[:,p]=att
     R[.~ic,p]= X[.~ic,p] .* att
 end
 
@@ -237,27 +237,11 @@ end
 
 
 
-bb=zeros(size(XX))
-bb[.~ic,:]=aa
-figure(figsize=(10, 5))
-imshow(pow2db.(XX .* bb), aspect = "auto")
-colorbar()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#bb=zeros(size(XX))
+#bb[.~ic,:]=aa
+#figure(figsize=(10, 5))
+#imshow(pow2db.(XX .* bb), aspect = "auto")
+#colorbar()
 
 
 fullcircle(X)=vcat(X,conj.(X[end-1:-1:2]))
@@ -273,19 +257,21 @@ function antistft(X)
         p+=m>>1
     end
     return result
-endy=real.(antistft(R))
+end
 
 sound(t, fs)
 
-y *= sum(abs2.(signals.test[8]+noises.test[4]))/sum(abs2.(y))
+y=real.(antistft(R))
+#y *= sum(abs2.(signals.test[8]+noises.test[4]))/sum(abs2.(y))
 
 sound(y, fs)
+wavwrite(y,"result.wav";Fs=8192)
 
-figure(figsize=(10, 5))
-imshow(aa, aspect = "auto")
-colorbar()
+#figure(figsize=(10, 5))
+#imshow(aa, aspect = "auto")
+#colorbar()
 
-aa
+
 
 
 figure(figsize=(10, 5))

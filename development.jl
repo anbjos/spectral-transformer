@@ -238,8 +238,10 @@ pe=[posenc(i,j) for i in 0:31, j in 0:15]
 
 figure(figsize=(10, 5))
 imshow(pe, aspect = "auto",cmap="Blues")
-title("positional encoding")
+title("positional encoding\n d=32, n=16")
 colorbar()
+ylabel("Position Embedding")
+xlabel("Sequence")
 
 pe[:,1]' * pe[:,5]
 
@@ -251,7 +253,9 @@ sum(cc(1,5))
 c=[pe[:,i]' * pe[:,j] for i in 1:16, j in 1:16]
 figure(figsize=(10, 5))
 imshow(c, aspect = "auto", cmap="Blues")
-title("positional encoding covariance")
+title("Position Embedding relative distance\n n=16")
+xlabel("Sequence")
+ylabel("Sequence")
 colorbar()
 
 print(plt.colormaps())

@@ -55,9 +55,9 @@ function (model::Model)(input)
     return result
 end
 
-sample=first(train)
-input=withmask(sample)
-model(input.x)
+#sample=first(train)
+#input=withmask(sample)
+#model(input.x)
 
 function loss(model, input)
     y=input.y
@@ -67,8 +67,8 @@ function loss(model, input)
     return Flux.mse(mask .*y, mask .* ŷ.hidden_state)
 end
 
-sample=first(test)
-loss(model,withmask(sample))
+#sample=first(test)
+#loss(model,withmask(sample))
 
 #4.83
 
