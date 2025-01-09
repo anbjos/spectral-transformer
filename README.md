@@ -379,7 +379,8 @@ Both the **Input Embedding** matrix $W_{\text{emb}}$ and the **Output Projection
 
 The positional encoding $\text{PE}(i, j)$ is defined for each embedding dimension $i$ and token position $j$ as:
 
-$$\text{PE}(i, j) =
+$$
+\text{PE}(i, j) =
 \begin{cases}
 \sin\left(\frac{j}{10000^{i/d}}\right), & \text{if } i \text{ is even}, \\
 \cos\left(\frac{j}{10000^{(i-1)/d}}\right), & \text{if } i \text{ is odd}.
@@ -391,14 +392,23 @@ Here:
 - $i$ is the embedding dimension index.
 - $d$ is the embedding dimensionality.
 
-This creates a matrix $\mathbf{P}$ where each column represents a token’s positional encoding.
+This creates a matrix $\mathbf{P}$ where each column represents a token’s positional encoding. The matrix is visualized below, showing that the embedding for the first position oscillates with a very high frequency, while the frequency decreases for larger positions.
+
+![positional encoding](figures/position.png)
+
+If we multiply the embeddings of two different positions and plot the resulting $sequence \times sequence$ matrix, the following pattern emerges:
+
+![distance](figures/distance.png)
+
+The raw dot product between two positional encodings defines a function that measures the relative distance between the two positions. Since the attention mechanism involves a dot product between $K^T$ and $Q$, it *can* capture the relative distance between inputs in the sequence. The term *can* is used because this process also involves multiplication with learned weights, allowing the model to adjust these weights during training to capture embedded data, relative or absolute position, or a combination of both.
+
 ---
 
-### Why It Works
+### Dot product of positional Embeddings
 
-1. Column Construction (Position as Column Index)
+#### 1. Column Construction (Position as Column Index)
 
-Assume the positional encoding matrix $\mathbf{P}$ has:
+To understand the mechanism behind this, assume the positional encoding matrix $\mathbf{P}$ has:
 - **$d$ rows** (each row corresponds to a dimension of the embedding),
 - **$n$ columns** (each column corresponds to a position $j$ in the sequence).
 
@@ -408,7 +418,7 @@ $$\mathbf{p}\_j = \bigl[\sin\bigl(\tfrac{j}{\alpha\_0}\bigr),\,\cos\bigl(\tfrac{
 
 where each $\alpha\_k$ (often $10000^{k/d}$) controls the wavelength of the $k$-th sine/cosine pair.
 
-2. Dot Product Involves Sine-Cosine Products
+#### 2. Dot Product Involves Sine-Cosine Products
 
 To compute the dot product between two columns $\mathbf{p}\_j$ and $\mathbf{p}\_{j'}$ (positions $j$ and $j'$), we pairwise multiply elements and sum them:
 
@@ -422,23 +432,13 @@ each sine-cosine pair becomes
 
 $$\cos\bigl(\tfrac{j}{\alpha\_k}-\tfrac{j'}{\alpha\_k}\bigr)=\cos\Bigl(\tfrac{j-j'}{\alpha\_k}\Bigr).$$
 
-3. Dependence on $(j-j')$
+#### 3. Dependence on $(j-j')$
 
 Summing across all frequencies $\alpha\_k$ yields terms of the form $\cos\bigl(\tfrac{j-j'}{\alpha\_k}\bigr)$. Hence, the dot product depends on the difference $(j-j')$:
 
 $$\mathbf{p}\_j \mathbf{p}\_{j'} = \sum_{k}\cos\Bigl(\frac{j-j'}{\alpha\_k}\Bigr).$$
 
 Because this expression depends only on $(j-j')$ and **not** on $j$ or $j'$ separately, it encodes the **relative distance** between these two positions in the sequence.
-
-4. Why This Matters
-
-- **Relative Position Encoding**: Since $\mathbf{p}\_j^\top\mathbf{p}\_{j'}$ is a function of $(j-j')$, the model inherently captures how far apart two positions are.
-
-- **Multi-Scale Representation**: Each frequency $\alpha\_k$ contributes a different periodicity, enabling both **local** and **global** positional differences to be represented.
-
-- **Generalization**: Because the encoding is based on sinusoids, a transformer can handle **varying sequence lengths** and still interpret relative positions consistently, even for positions not seen during training.
-
-By aligning each **column** with a position $j$ in the sequence, we see that the **dot product** between columns depends on $(j-j')$. This emerges from the trigonometric identities that convert products of sine and cosine terms into functions of **phase differences**, effectively encoding **relative** positional information.
 
 ---
 

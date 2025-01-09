@@ -224,3 +224,35 @@ plot(V,"--")
 
 # Another optios is to limit each bin so that it could not violate Y1, even if all other bins was 0. 
 # This is more relaxed, but solve the ringing issue that may exist at the edges.
+
+
+function posenc(i,j,d=32)
+    if iseven(i)
+        result=sin(j/10000^(i/d))
+    else
+        result=cos(j/10000^((i-1)/d))
+    end
+end
+
+pe=[posenc(i,j) for i in 0:31, j in 0:15]
+
+figure(figsize=(10, 5))
+imshow(pe, aspect = "auto",cmap="Blues")
+title("positional encoding")
+colorbar()
+
+pe[:,1]' * pe[:,5]
+
+d=32
+
+cc(j,k)=[cos((j-k)/1000^(i/d)) for i in 0:d-1]
+sum(cc(1,5))
+
+c=[pe[:,i]' * pe[:,j] for i in 1:16, j in 1:16]
+figure(figsize=(10, 5))
+imshow(c, aspect = "auto", cmap="Blues")
+title("positional encoding covariance")
+colorbar()
+
+print(plt.colormaps())
+PyPlot.cm
