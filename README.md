@@ -18,7 +18,7 @@ Even with a relatively simple transformer network, excellent performance can be 
 ![Signal without noise](figures/signal.png)
 ![Listen to signal](https://github.com/anbjos/spectral-transformer/blob/main/figures/signal.wav) (Choose "Download Raw" to hear the audio)
 
-3. **Cleaned Signal with Noise** (Figure 3): This is the output of the network, showing its ability to effectively suppress noise and isolate the speech signal, even on out-of-sample data.
+3. **Cleaned Signal with Noise** (Figure 3): This audio is reconstructed from the network's output, demonstrating its ability to suppress noise and isolate speech, even with out-of-sample data.
 
 ![Cleaned signal with noise](figures/result.png)
 ![Listen to result](https://github.com/anbjos/spectral-transformer/blob/main/figures/result.wav) (Choose "Download Raw" to hear the audio)
@@ -42,7 +42,7 @@ $$
 X \in \mathbb{R}^{d \times n}
 $$
 
-where each column corresponds to the representation of an element in the sequence.
+where **each column corresponds to the representation of an element in the sequence**.
 
 #### 2. Linear Transformations to Obtain Query, Key, and Value
 
@@ -64,7 +64,8 @@ Here:
 - $d_k$ is the dimension of the query and key vectors.  
 - $d_v$ is the dimension of the value vectors.
 
-The weight matrices $W_Q$, $W_K$, and $W_V$ are trained during the learning process, with each attention head independently learning its own set of weights.
+
+The weight matrices $W\_Q$, $W\_K$, and $W\_V$ are trained during the learning process, with each attention head independently learning its own set of weights. Each element in the input sequence is linearly mapped into a column in $Q$, $K$, and $V$.
 
 After the transformations:
 - $Q \in \mathbb{R}^{d_k \times n}$,
@@ -99,7 +100,7 @@ $$
 
 #### 4. Softmax to Compute Attention Weights
 
-The [softmax](https://en.wikipedia.org/wiki/Softmax_function) function is applied row-wise to the scaled attention scores to produce attention weights, ensuring that each row forms a probability distribution that sums to 1:
+The [softmax](https://en.wikipedia.org/wiki/Softmax_function) function is applied column-wise to the scaled attention scores to produce attention weights, ensuring that each column forms a probability distribution that sums to 1:
 
 $$
 A = \text{Softmax}\left(\frac{K^T Q}{\sqrt{d_k}}\right)
@@ -108,10 +109,10 @@ $$
 For the $i$-th query, the attention weight for the $j$-th key is:
 
 $$
-A_{ij} = \frac{\exp(S_{ij})}{\sum_{k=1}^n \exp(S_{ik})}
+A_{ij} = \frac{\exp(S_{ij})}{\sum_{k=1}^n \exp(S_{kj})}
 $$
 
-This results in the attention weights matrix $A \in \mathbb{R}^{n \times n}$, where each row represents how much each key contributes to the respective query.
+This produces the attention weight matrix $A \in \mathbb{R}^{n \times n}$, where each element $A_{ij}$ quantifies the contribution of the $j$-th key to the $i$-th query.
 
 #### 5. Weighted Sum Using Values
 
@@ -136,9 +137,11 @@ which is the output of the attention mechanism.
 ---
 ### Explanation Summary
 
-The attention mechanism identifies and amplifies important relationships between sequence elements. For example, if the first and third column in $X$ have high similarity (as measured by the dot product), the attention score $S_{1,3}$ will be large. After applying softmax, this results in a high weight $A_{1,3}$, causing the third column in $V$ to contribute significantly to the first column in $O$.
+The attention mechanism identifies and amplifies important relationships between sequence elements. Each column in $V$ represents an abstract [embedding](https://en.wikipedia.org/wiki/Word_embedding) of an element in the input to the attention head. The $j$-th column of $A$ represents the weighting of these embeddings for calculating the $j$-th element in the output, with the $i$-th element representing the weight of the $i$-th embedding.
 
-The weight matrices $W_Q$, $W_K$, and $W_V$ are learned during training and independently transform each input column into corresponding columns of queries, keys, and values. This enables the model to capture the necessary relationships for effective task performance.
+The weight matrices $W_Q$, $W_K$, and $W_V$ are learned during training and independently map each input element (each column in $X$) to corresponding columns in the query, key, and value matrices. This independent transformation allows the model to capture the necessary relationships for effective task performance.
+
+Even though the explanation focuses on the sequential nature of the inputs, it is important to emphasize that the primary motivation behind this architecture is to enable parallel processing. In other words, the entire input sequence is processed simultaneously within the attention head. 
 
 
 ## Multi-Head Attention Mechanism
@@ -260,7 +263,7 @@ Increasing the dimension to $d_\text{ffn}$ (typically $4d$) enables the model to
 Finally, the result is integrated using another add and norm layer. The complete chain can be written:
 
 $$
-Z=FirstNormalization(X)\\
+Z = FirstNormalization(X)\\
 Y = LayerNorm(FeedForwardLayer(Z)+Z)
 $$
 
@@ -268,7 +271,7 @@ $$
 
 ## Transformer Block
 
-The system considered here is an **encoder**, composed of $N$ stacked **Transformer attention layers**, each integrating multi-head attention, feed-forward layers, and add and norm operations. These layers process input sequences into high-dimensional representations, making the encoder suitable for tasks like classification, sound processing, or summarization.
+The system considered here is an **encoder**, composed of $N$ stacked **Transformer attention layers**, each integrating multi-head attention, feed-forward layers, and add and norm operations. These layers process input sequences into high-dimensional representations.
 
 The original Transformer architecture, as introduced in [*Attention Is All You Need*](https://arxiv.org/html/1706.03762v7), included both an encoder and a decoder:
 
@@ -333,17 +336,15 @@ where $W_{\text{out}} \in \mathbb{R}^{d_U \times d}$ and $Y \in \mathbb{R}^{d \t
 
 $$\text{OutputProjection}(Y) \in \mathbb{R}^{d_U \times n}.$$
 
-### Independent Learned Transformations
-
 Both the **Input Embedding** matrix $W_{\text{emb}}$ and the **Output Projection** matrix $W_{\text{out}}$ are **learned independently** during training. There is **no enforced relationship** between them, allowing each to optimize its transformation for its specific role:
-
-- **Input Embedding ($W_{\text{emb}}$):** Projects raw audio features into the Transformer's embedding space.
-- **Output Projection ($W_{\text{out}}$):** Maps the Transformer's output back to the original audio feature space.
-
 
 ---
 
 ## Positional Encoding
+
+Without explicit positional information, the model only sees a set of token embeddings and has no built-in way of telling how they are ordered in the sequence—a critical factor for learning the attention weights. Because the Transformer processes all tokens in parallel, it lacks the sequential tracking found in [recurrent architectures](https://en.wikipedia.org/wiki/Recurrent_neural_network). Positional encoding injects a continuous, unique representation of each token’s position, enabling the model to capture both content and order.
+
+### Definition of PE
 
 The positional encoding $\text{PE}(i, j)$ is defined for each embedding dimension $i$ and token position $j$ as:
 
