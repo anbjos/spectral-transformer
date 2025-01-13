@@ -545,7 +545,7 @@ The scaling factors used during signal whitening were stored. In the anti-whiten
 
 The next step involves converting the signal representation from the logarithmic dB scale back to the power domain by applying the inverse transformation:
 
-$$\text{anti\_dB}(dB)=10^{\frac{dB}{10}}$$
+$$\text{antidB}(dB)=10^{\frac{dB}{10}}$$
 
 ### Attenuation
 
