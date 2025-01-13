@@ -545,66 +545,48 @@ The scaling factors used during signal whitening were stored. In the anti-whiten
 
 The next step involves converting the signal representation from the logarithmic dB scale back to the power domain by applying the inverse transformation:
 
-$$
-\text{anti\_dB}(dB) = 10^{\frac{dB}{10}}
-$$
+$$\text{anti\_dB}(dB)=10^{\frac{dB}{10}}$$
 
 ### Attenuation
 
-For each column $u_P$ in $U_P$, we aim to define an attenuation that can be applied to each element of $u_P$. The attenuated version of $u_P$ should yield the same power output during audio processing as the corresponding output $y$ from the transformer model, where $y$ is the column in $Y$ corresponding to $u_P$.
+For each column $u\_P$ in $U\_P$, we aim to define an attenuation that can be applied to each element of $u\_P$. The attenuated version of $u\_P$ should yield the same power output during audio processing as the corresponding output $y$ from the transformer model, where $y$ is the column in $Y$ corresponding to $u\_P$.
 
-Inspection of $M$ shows that it contains all-zero rows, meaning that multiplying any vector by $M$ results in a non-regular system of equations. To address this, we first define a modified version of $M$ that excludes zero rows. We introduce the function $\text{RegularRows}(M)$, which removes all-zero rows from $M$. This function is extended to $\text{RegularRows}(u_P, M)$, which removes corresponding rows in $u_P$ that align with the zero rows in $M$.
+Inspection of $M$ shows that it contains all-zero rows, meaning that multiplying any vector by $M$ results in a non-regular system of equations. To address this, we first define a modified version of $M$ that excludes zero rows. We introduce the function $\text{RegularRows}(M)$, which removes all-zero rows from $M$. This function is extended to $\text{RegularRows}(u\_P, M)$, which removes corresponding rows in $u\_P$ that align with the zero rows in $M$.
 
-$$
-\tilde{M} = \text{RegularRows}(M), \quad \tilde{M} \in \mathbb{R}^{\tilde{m} \times n}
-$$
+$$\tilde{M}=\text{RegularRows}(M),\quad \tilde{M}\in\mathbb{R}^{\tilde{m}\times n}$$
 
-$$
-\tilde{u}_P = \text{RegularRows}(u_P, M), \quad \tilde{u}_P \in \mathbb{R}^{\tilde{m}}
-$$
+$$\tilde{u}\_P=\text{RegularRows}(u\_P, M),\quad \tilde{u}\_P\in\mathbb{R}^{\tilde{m}}$$
 
 where $\tilde{m}$ represents the number of non-zero rows in $M$.
 
-Next, we introduce $x \in \mathbb{R}^{\tilde{m}}$, where $\tilde{M} \cdot x$ represents the desired attenuation. The relationship is expressed as:
+Next, we introduce $x\in\mathbb{R}^{\tilde{m}}$, where $\tilde{M}\cdot x$ represents the desired attenuation. The relationship is expressed as:
 
-$$
-y = \tilde{M} \cdot \text{Diagonal}(\tilde{M}' x) \cdot \tilde{u}_P
-$$
+$$y=\tilde{M}\cdot \text{Diagonal}(\tilde{M}'x)\cdot \tilde{u}\_P$$
 
-Here, $\text{Diagonal}(\tilde{M}' x)$ represents an attenuation applied to the vector $\tilde{u}_P$. Since $U_P$ represents power, this equation ensures that the attenuated version maintains the same power output. This can be rewritten as a linear system:
+Here, $\text{Diagonal}(\tilde{M}'x)$ represents an attenuation applied to the vector $\tilde{u}\_P$. Since $U\_P$ represents power, this equation ensures that the attenuated version maintains the same power output. This can be rewritten as a linear system:
 
-$$
-y = \tilde{M} \cdot \text{Diagonal}(\tilde{M}' \cdot \tilde{u}_P) \cdot x
-$$
+$$y=\tilde{M}\cdot \text{Diagonal}(\tilde{M}'\cdot \tilde{u}\_P)\cdot x$$
 
 From $x$, we can derive the attenuation we are seeking:
 
-$$
-\text{attenuation} = \tilde{M}' x
-$$
+$$\text{attenuation}=\tilde{M}'x$$
 
-Finally, we must account for the zero rows that were removed from $M$. To do this, we define the function $\text{ReconstructRows}(\tilde{u}_P, M)$, which reinserts zeros at the positions of the discarded rows in $\tilde{u}_P$. The reconstructed signal, representing the attenuated power, can then be written as:
+Finally, we must account for the zero rows that were removed from $M$. To do this, we define the function $\text{ReconstructRows}(\tilde{u}\_P, M)$, which reinserts zeros at the positions of the discarded rows in $\tilde{u}\_P$. The reconstructed signal, representing the attenuated power, can then be written as:
 
-$$
-u_P = \text{ReconstructRows}(\text{Diagonal}(\text{attenuation}) \cdot \tilde{u}_P, M)
-$$
+$$u\_P=\text{ReconstructRows}(\text{Diagonal}(\text{attenuation})\cdot \tilde{u}\_P, M)$$
 
 ### Including Phase Information
 
-In addition to the power signal $u_P$, we introduce the complex-valued signal $u_{\mathbb{C}} \in \mathbb{C}^m$, which includes both amplitude and phase information. Since the attenuation affects the amplitude of the signal but does not alter its phase, the same attenuation derived from $u_P$ is applied to $u_{\mathbb{C}}$.
+In addition to the power signal $u\_P$, we introduce the complex-valued signal $u\_{\mathbb{C}}\in\mathbb{C}^m$, which includes both amplitude and phase information. Since the attenuation affects the amplitude of the signal but does not alter its phase, the same attenuation derived from $u\_P$ is applied to $u\_{\mathbb{C}}$.
 
 The attenuated complex signal can be expressed as:
 
-$$
-u_{\mathbb{C}} = \text{ReconstructRows}(\text{Diagonal}(\text{attenuation}) \cdot \tilde{u}_{\mathbb{C}}, M)
-$$
+$$u\_{\mathbb{C}}=\text{ReconstructRows}(\text{Diagonal}(\text{attenuation})\cdot \tilde{u}\_{\mathbb{C}}, M)$$
 
 where
 
-$$
-\tilde{u}_{\mathbb{C}} = \text{RegularRows}(u_{\mathbb{C}}, M)
-$$
+$$\tilde{u}\_{\mathbb{C}}=\text{RegularRows}(u\_{\mathbb{C}}, M)$$
 
 represents the version of the complex signal with zero rows removed.
 
-Thus, the derived attenuation ensures that both the power signal $u_P$ and the complex signal $u_{\mathbb{C}}$ are processed consistently, maintaining their respective power and phase characteristics.
+Thus, the derived attenuation ensures that both the power signal $u\_P$ and the complex signal $u\_{\mathbb{C}}$ are processed consistently, maintaining their respective power and phase characteristics.
