@@ -207,11 +207,11 @@ $$
 X\in \mathbb{R}^{d \times n},Y\in \mathbb{R}^{d \times n}, Z\in \mathbb{R}^{d \times n}
 $$
 
-This function processes the input \( X \) through attention heads and combines their outputs into a single representation.
+This function processes the input $X$ through attention heads and combines their outputs into a single representation.
 
 The add and norm layer then performs the following steps:
 
-1. **Residual Connection**: Adds the original input \( X \) to the attention output:
+1. **Residual Connection**: Adds the original input $X$ to the attention output:
 
 $$
 Y = X + \text{MultiHeadAttention}(X)
@@ -303,7 +303,7 @@ transformer_block = TransformerBlock(
 )
 ```
 
-Frameworks like [Transformers.jl](https://github.com/chengchingwen/Transformers.jl) provide modular implementations, enabling easy customization of encoder blocks. This example demonstrates how to set up a stack of \( N \) attention layers for encoder-based tasks.
+Frameworks like [Transformers.jl](https://github.com/chengchingwen/Transformers.jl) provide modular implementations, enabling easy customization of encoder blocks. This example demonstrates how to set up a stack of $N$ attention layers for encoder-based tasks.
 
 ---
 
@@ -549,37 +549,62 @@ $$
 \text{anti\_dB}(dB) = 10^{\frac{dB}{10}}
 $$
 
-###
+### Attenuation
 
-Lets $y \in \mathbb{R}^d_U \times n$ represent the output of the transformer model for one . When we consider $y$ a single column in $Y$, corresponding to one $sftf$, we would like to find scaling of each of the components in this $sftf$. The problem is that due to the MEL-dimention reduction, the linear equation for this problem is underdetermined with many possible solutions. 
+For each column $u_P$ in $U_P$, we aim to define an attenuation that can be applied to each element of $u_P$. The attenuated version of $u_P$ should yield the same power output during audio processing as the corresponding output $y$ from the transformer model, where $y$ is the column in $Y$ corresponding to $u_P$.
 
-Considering what the $\tilde{M}$ actually look like provides a possible work around. The matrix specifies how much weight each component in the $sftf$ contribute with to the MEL representaion. Flipping this around, we could say that we want an attenuation of the components in the $sftf$ that depend on the ratio of the input power to the output power as required from the model output, but also reflect how much weight each component in the $sftf$ contribute with.
-
-Lets consider a unknown vector $x \mathbb{R}^d_U \times n$. We can map this into the $sftf$ components through the operation
+Inspection of $M$ shows that it contains all-zero rows, meaning that multiplying any vector by $M$ results in a non-regular system of equations. To address this, we first define a modified version of $M$ that excludes zero rows. We introduce the function $\text{RegularRows}(M)$, which removes all-zero rows from $M$. This function is extended to $\text{RegularRows}(u_P, M)$, which removes corresponding rows in $u_P$ that align with the zero rows in $M$.
 
 $$
-\tilde{M} x \in \mathbb{R}^{\tilde{m}}
+\tilde{M} = \text{RegularRows}(M), \quad \tilde{M} \in \mathbb{R}^{\tilde{m} \times n}
 $$
 
-Where $\tilde{m}$ is the number of components in the $sftf$ that is not ignored when construction the MEL filter bank.
-
 $$
-Y=\tilde{M}*Diagonal(\tilde{M}'*x)*u.
+\tilde{u}_P = \text{RegularRows}(u_P, M), \quad \tilde{u}_P \in \mathbb{R}^{\tilde{m}}
 $$
 
+where $\tilde{m}$ represents the number of non-zero rows in $M$.
 
-Lets define a function that operates on the matrix M, that represent the MEL filter bank. We call this function regular_rows, and it simply dischart all zero rows. We can then write:
+Next, we introduce $x \in \mathbb{R}^{\tilde{m}}$, where $\tilde{M} \cdot x$ represents the desired attenuation. The relationship is expressed as:
 
 $$
-\tilde{M}=RegularRows(M)
+y = \tilde{M} \cdot \text{Diagonal}(\tilde{M}' x) \cdot \tilde{u}_P
 $$
 
+Here, $\text{Diagonal}(\tilde{M}' x)$ represents an attenuation applied to the vector $\tilde{u}_P$. Since $U_P$ represents power, this equation ensures that the attenuated version maintains the same power output. This can be rewritten as a linear system:
 
+$$
+y = \tilde{M} \cdot \text{Diagonal}(\tilde{M}' \cdot \tilde{u}_P) \cdot x
+$$
 
+From $x$, we can derive the attenuation we are seeking:
 
+$$
+\text{attenuation} = \tilde{M}' x
+$$
 
+Finally, we must account for the zero rows that were removed from $M$. To do this, we define the function $\text{ReconstructRows}(\tilde{u}_P, M)$, which reinserts zeros at the positions of the discarded rows in $\tilde{u}_P$. The reconstructed signal, representing the attenuated power, can then be written as:
 
+$$
+u_P = \text{ReconstructRows}(\text{Diagonal}(\text{attenuation}) \cdot \tilde{u}_P, M)
+$$
 
+### Including Phase Information
 
+In addition to the power signal $u_P$, we introduce the complex-valued signal $u_{\mathbb{C}} \in \mathbb{C}^m$, which includes both amplitude and phase information. Since the attenuation affects the amplitude of the signal but does not alter its phase, the same attenuation derived from $u_P$ is applied to $u_{\mathbb{C}}$.
 
----
+The attenuated complex signal can be expressed as:
+
+$$
+u_{\mathbb{C}} = \text{ReconstructRows}(\text{Diagonal}(\text{attenuation}) \cdot \tilde{u}_{\mathbb{C}}, M)
+$$
+
+where
+
+$$
+\tilde{u}_{\mathbb{C}} = \text{RegularRows}(u_{\mathbb{C}}, M)
+$$
+
+represents the version of the complex signal with zero rows removed.
+
+Thus, the derived attenuation ensures that both the power signal $u_P$ and the complex signal $u_{\mathbb{C}}$ are processed consistently, maintaining their respective power and phase characteristics.
