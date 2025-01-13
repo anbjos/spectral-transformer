@@ -137,7 +137,7 @@ which is the output of the attention mechanism.
 ---
 ### Explanation Summary
 
-The attention mechanism identifies and amplifies important relationships between sequence elements. Each column in $V$ represents an abstract [embedding](https://en.wikipedia.org/wiki/Word_embedding) of an element in the input to the attention head. The $j$-th column of $A$ represents the weighting of these embeddings for calculating the $j$-th element in the output, with the $i$-th element representing the weight of the $i$-th embedding.
+The attention mechanism identifies and amplifies important relationships between sequence elements. Each column in $V$ represents an abstract [embedding](https://en.wikipedia.org/wiki/Word_embedding) of an element in the input to the attention head. The $j$-th column of $A$ represents the weighting of these embeddings for calculating the $j$-th element in the output, with the $i$-th element representing the weight of the $i$-th column in $V$.
 
 The weight matrices $W_Q$, $W_K$, and $W_V$ are learned during training and independently map each input element (each column in $X$) to corresponding columns in the query, key, and value matrices. This independent transformation allows the model to capture the necessary relationships for effective task performance.
 
@@ -342,7 +342,7 @@ Both the **Input Embedding** matrix $W_{\text{emb}}$ and the **Output Projection
 
 ## Positional Encoding
 
-Without explicit positional information, the model only sees a set of token embeddings and has no built-in way of telling how they are ordered in the sequence—a critical factor for learning the attention weights. Because the Transformer processes all tokens in parallel, it lacks the sequential tracking found in [recurrent architectures](https://en.wikipedia.org/wiki/Recurrent_neural_network). Positional encoding injects a continuous, unique representation of each token’s position, enabling the model to capture both content and order.
+Without explicit positional information, the model sees only a set of token embeddings, with no inherent way to determine their order in the sequence. This means the model would need to learn the relationships between neighboring tokens solely from the data, without knowing which tokens are adjacent. Since this approach is inefficient, positional embeddings are introduced to provide the model with information about token positions.
 
 ### Definition of PE
 
@@ -479,7 +479,7 @@ Before feeding raw audio signals into the **Spectral Transformer**, they undergo
 
 ### Short-Time Fourier Transform
 
-The first step involves applying the [Short-Time Fourier Transform (STFT)](https://en.wikipedia.org/wiki/Short-time_Fourier_transform) to convert the audio signal from the time domain to a sequence of Short Fourier Transforms. This is done using an FFT length of $d_U$ and a modified [Hanning window](https://en.wikipedia.org/wiki/Hann_function):
+The first step involves applying the [Short-Time Fourier Transform (STFT)](https://en.wikipedia.org/wiki/Short-time_Fourier_transform) to convert the audio signal from the time domain to a sequence of Short Fourier Transforms. This is done using an [FFT](https://en.wikipedia.org/wiki/Fast_Fourier_transform) length of $d_U$ and a modified [Hanning window](https://en.wikipedia.org/wiki/Hann_function):
 
 $$w(k) = \sin^2\left(\frac{\pi k}{d_U}\right), \quad k \in [1 \dots d_U]$$
 
@@ -531,3 +531,55 @@ Whitening helps reduce bias from background noise and enhances model generalizat
 
 $$U=whiten(clamp(X_M))$$
 
+## Audio Signal Reconstruction
+
+Audio signal reconstruction is, in many ways, similar to audio processing but performed in the reverse order. However, several challenges remain, primarily because the transformer operates on data in the power domain, while an audio signal in the frequency domain is defined by both amplitude and phase. Additionally, the MEL spectral bank applies dimensionality reduction, which leads to a loss of information.
+
+---
+
+### Anti-Whitening
+
+The scaling factors used during signal whitening were stored. In the anti-whitening process, these stored scaling factors are applied in reverse to restore the original signal scale.
+
+### Anti-dB
+
+The next step involves converting the signal representation from the logarithmic dB scale back to the power domain by applying the inverse transformation:
+
+$$
+\text{anti\_dB}(dB) = 10^{\frac{dB}{10}}
+$$
+
+###
+
+Lets $y \in \mathbb{R}^d_U \times n$ represent the output of the transformer model for one . When we consider $y$ a single column in $Y$, corresponding to one $sftf$, we would like to find scaling of each of the components in this $sftf$. The problem is that due to the MEL-dimention reduction, the linear equation for this problem is underdetermined with many possible solutions. 
+
+Considering what the $\tilde{M}$ actually look like provides a possible work around. The matrix specifies how much weight each component in the $sftf$ contribute with to the MEL representaion. Flipping this around, we could say that we want an attenuation of the components in the $sftf$ that depend on the ratio of the input power to the output power as required from the model output, but also reflect how much weight each component in the $sftf$ contribute with.
+
+Lets consider a unknown vector $x \mathbb{R}^d_U \times n$. We can map this into the $sftf$ components through the operation
+
+$$
+\tilde{M} x \in \mathbb{R}^{\tilde{m}}
+$$
+
+Where $\tilde{m}$ is the number of components in the $sftf$ that is not ignored when construction the MEL filter bank.
+
+$$
+Y=\tilde{M}*Diagonal(\tilde{M}'*x)*u.
+$$
+
+
+Lets define a function that operates on the matrix M, that represent the MEL filter bank. We call this function regular_rows, and it simply dischart all zero rows. We can then write:
+
+$$
+\tilde{M}=RegularRows(M)
+$$
+
+
+
+
+
+
+
+
+
+---
