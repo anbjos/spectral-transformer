@@ -166,105 +166,36 @@ O_2 \\
 \vdots \\
 O_h
 \end{bmatrix} 
-\in \mathbb{R}^{(h \cdot d_v) \times n}.
+\in \mathbb{R}^{d \times n}.
 $$
 
-This stacking operation forms a larger matrix where each attention head contributes a block of rows corresponding to its output. The result is a multi-faceted representation of the input that encapsulates the distinct features learned by each head.
-
-### Dimensionality Constraints for Attention Heads
-
-To ensure that the combined output aligns with the model's overall feature dimension $d$, the relationship between the number of attention heads ($h$), the dimension of each head’s output ($d_v$), and the total model dimension ($d$) must satisfy:
-
-$$
-h \cdot d_v = d,
-$$
-
-where:
-- $d$ is the model’s total feature dimension,
-- $h$ is the number of attention heads,
-- $d_v$ is the feature dimension of each head.
-
-This constraint ensures that the combined matrix $O_{\text{MultiHead}}$ has a total of $d$ rows, regardless of how many heads are used. As the number of heads increases, the dimension of each head’s output ($d_v$) must decrease proportionally. This tradeoff balances the model's ability to focus on diverse features across heads with the capacity of individual heads to represent detailed patterns.
-
-By stacking attention outputs in this way, multi-head attention integrates diverse insights from the input data while preserving a structured and scalable approach to feature representation.
+This stacking operation forms a larger matrix where each attention head contributes a block of rows corresponding to its output. The result is a multi-faceted representation of the input that encapsulates the distinct features learned by each head. The combined output remains manageable and compatible with the rest, adhering to the convention of having $d$ rows. This introduces the constraint $h \cdot d_v = d$.
 
 ## Attention Layer
-
 The Transformer architecture, introduced in the paper [*Attention Is All You Need*](https://arxiv.org/html/1706.03762v7) (Vaswani et al., 2017), is built around the multi-head self-attention mechanism, supported by feed-forward layers and add and norm operations. This section focuses on these **support layers**, which, as shown in the architecture diagram below. 
+
 ![Transformer architecture](https://arxiv.org/html/1706.03762v7/extracted/1706.03762v7/Figures/ModalNet-21.png)
 
-### First Add and Norm Layer
-
-The first add and norm layer integrates the output of the multi-head attention mechanism back into the network. Multi-head attention can be represented as a function:
+The feed-forward layer increases the dimension to $d\_\text{ffn}$ (typically $4d$), which enables the model to capture richer and more complex features in a higher-dimensional space. Subsequently, the dimension is reduced back to $d$, ensuring the output remains manageable and compatible with the rest of the architecture, while still benefiting from the complex intermediate representations. Using [ReLU](https://en.wikipedia.org/wiki/Rectifier_(neural_networks)) as the [activation function](https://en.wikipedia.org/wiki/Activation_function) in the layer, this can be described as:
 
 $$
-Y=\text{MultiHeadAttention}(X)
+\text{FeedForwardLayer}(X) = W_2 (\text{ReLU}(W_1 X + b_1)) + b_2
 $$
 
-Here $X,Y,Z$ represent inputs to functions and
+where $W_1 \in \mathbb{R}^{d\_\text{ffn} \times d}$, $b_1 \in \mathbb{R}^{d\_\text{ffn}}$, $W_2 \in \mathbb{R}^{d \times d\_\text{ffn}}$, and $b_2 \in \mathbb{R}^{d}$.
+
+To improve gradient flow, attention layers also apply [residual connections](https://en.wikipedia.org/wiki/Residual_neural_network). These signals are added to the processed signals, and the results are normalized to stabilize the gradients. Introducing the function [Normalization](https://en.wikipedia.org/wiki/Normalization_(machine_learning)) that take an input in $\mathbb{R}^{d \times n}$, we can write the processing in an attention layer as:
 
 $$
-X\in \mathbb{R}^{d \times n},Y\in \mathbb{R}^{d \times n}, Z\in \mathbb{R}^{d \times n}
+\text{MultiHeadAttentionWithResidual}(X)=\text{Normalize}(X+\text{MultiHeadAttention}(X))
 $$
 
-This function processes the input $X$ through attention heads and combines their outputs into a single representation.
-
-The add and norm layer then performs the following steps:
-
-1. **Residual Connection**: Adds the original input $X$ to the attention output:
-
 $$
-Y = X + \text{MultiHeadAttention}(X)
+\text{FeedForwardWithResidual}(X)=\text{Normalize}(X+\text{FeedForwardLayer}(X))
 $$
 
-2. **Layer Normalization**: [Normalizes](https://en.wikipedia.org/wiki/Normalization_(machine_learning)#Layer_normalization) the combined result for stability:
-
 $$
-Y = \text{LayerNorm}(X)
-$$
-
-Combining these into one function provide:
-
-$$
-FirstNormalization(X) = \text{LayerNorm}(X + \text{MultiHeadAttention}(X))
-$$
-
-It ensures stable gradients and prepares the output for further processing.
-
-### Feed-Forward Layer
-
-The feed-forward layer processes the normalized output $Z$ with two linear transformations and a ReLU activation:
-
-1. **Linear Transformation and Activation**:
-
-$$
-Y = \text{ReLU}(W_1 X + b_1)
-$$
-
-where $W_1 \in \mathbb{R}^{d_\text{ffn} \times d}$ and $b_1 \in \mathbb{R}^{d_\text{ffn}}$. Typically, $d_\text{ffn}$ is set to **4 times** the input dimension $d$, allowing the layer to model more complex interactions.
-
-2. **Second Linear Transformation**:
-
-$$
-Y = W_2 X + b_2
-$$
-
-where $W_2 \in \mathbb{R}^{d \times d_\text{ffn}}$ and $b_2 \in \mathbb{R}^d$. This transformation reduces the dimension back to $d$, ensuring the output size remains consistent with the original input.
-
-Combining these provides:
-
-$$
-FeedForwardLayer(X) = W_2 (\text{ReLU}(W_1 X + b_1)) + b_2
-$$
-
-**Why increase and then decrease the dimension?**  
-Increasing the dimension to $d_\text{ffn}$ (typically $4d$) enables the model to capture richer and more complex features in a higher-dimensional space. Reducing the dimension back to $d$ ensures the output remains manageable and compatible with the rest of the architecture, while still benefiting from the complex intermediate representations.
-
-Finally, the result is integrated using another add and norm layer. The complete chain can be written:
-
-$$
-Z = FirstNormalization(X)\\
-Y = LayerNorm(FeedForwardLayer(Z)+Z)
+\text{AttentionLayer}=\text{FeedForwardWithResidual} \circ \text{MultiHeadAttentionWithResidual}
 $$
 
 ---
