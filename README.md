@@ -143,20 +143,21 @@ The weight matrices $W_Q$, $W_K$, and $W_V$ are learned during training and inde
 
 Even though the explanation focuses on the sequential nature of the inputs, it is important to emphasize that the primary motivation behind this architecture is to enable parallel processing. In other words, the entire input sequence is processed simultaneously within the attention head. 
 
+---
 
 ## Multi-Head Attention Mechanism
 
-To capture a diverse range of features and relationships in the input data, multi-head attention employs multiple attention "heads" that operate in parallel. Each head focuses on different aspects of the data by independently calculating attention outputs using its own learned weight matrices. This approach allows the model to process and integrate multiple perspectives simultaneously, enabling richer representations of the input.
+Multi-head attention employs multiple attention "heads" operating in parallel, with each head focusing on different aspects of the input by independently computing attention outputs using its own learned weight matrices. This allows the model to capture a diverse range of features and relationships, resulting in richer input representations.
 
 ### Parallel Attention Heads and Matrix Combination
 
-Each of the $h$ attention heads computes its own output matrix:
+Each of the $h$ attention heads computes an output matrix:
 
 $$
 O_i = V_i A_i \quad \text{for } i = 1, 2, \dots, h,
 $$
 
-where $O_i \in \mathbb{R}^{d_v \times n}$ represents the output from the $i$-th attention head. To integrate these outputs, the results from all heads are stacked vertically into a single matrix:
+where $O_i \in \mathbb{R}^{d_v \times n}$ is the output of the $i$-th head. The outputs from all heads are stacked vertically to form a single matrix:
 
 $$
 O_{\text{MultiHead}} = 
@@ -169,7 +170,9 @@ O_h
 \in \mathbb{R}^{d \times n}.
 $$
 
-This stacking operation forms a larger matrix where each attention head contributes a block of rows corresponding to its output. The result is a multi-faceted representation of the input that encapsulates the distinct features learned by each head. The combined output remains manageable and compatible with the rest, adhering to the convention of having $d$ rows. This introduces the constraint $h \cdot d_v = d$.
+This stacking yields a unified matrix where each head contributes distinct features. The combined output adheres to the convention of having $d$ rows, enforcing the constraint $h \cdot d_v = d$.
+
+---
 
 ## Attention Layer
 The Transformer architecture, introduced in the paper [*Attention Is All You Need*](https://arxiv.org/html/1706.03762v7) (Vaswani et al., 2017), is built around the multi-head self-attention mechanism, supported by feed-forward layers and add and norm operations. This section focuses on these **support layers**, which, as shown in the architecture diagram below. 
@@ -418,7 +421,7 @@ Although the first element of this window is not zero, it is still effective due
 
 The resulting STFT is given by:
 
-$$X_{\mathbb{C}} = \text{stft}(u, h, \text{step} = \frac{d_U}{2})$$
+$$X_{\mathbb{C}} = \text{stft}(u_{audio}, h, \text{step} = \frac{d_U}{2})$$
 
 Here, the subscript $\mathbb{C}$ indicates that the resulting matrix is complex, containing both amplitude and phase information in the frequency domain. For a real input signal, the STFT returns the [DC component](https://en.wikipedia.org/wiki/DC_bias), positive frequencies, and the [Nyquist frequency](https://en.wikipedia.org/wiki/Nyquist_frequency), since negative frequencies are the complex conjugates of positive ones.
 
@@ -504,32 +507,30 @@ where $\tilde{m}$ represents the number of non-zero rows in $M$.
 
 Next, we introduce $w\in\mathbb{R}^{\tilde{m}}$, where $\tilde{M}\cdot w$ represents the desired attenuation. The relationship is expressed as:
 
-$$y=\tilde{M}\cdot \text{Diagonal}(\tilde{M}'w)\cdot \tilde{u}\_P$$
+$$y=\tilde{M}\cdot \text{Diagonal}(\tilde{M}^{T}w)\cdot \tilde{u}\_P$$
 
-Here, $\text{Diagonal}(\tilde{M}'w)$ represents an attenuation applied to the vector $\tilde{u}\_P$. Since $U\_P$ represents power, this equation ensures that the attenuated version maintains the same power output. This can be rewritten as a linear system:
+Here, $\text{Diagonal}(\tilde{M}^{T} w)$ represents an attenuation applied to the vector $\tilde{u}\_P$. Since $U\_P$ represents power, this equation ensures that the attenuated version maintains the same power output. This can be rewritten as a linear system:
 
-$$y=\tilde{M}\cdot \text{Diagonal}(\tilde{M}'\cdot \tilde{u}\_P)\cdot w$$
+$$y=\tilde{M}\cdot \text{Diagonal}(\tilde{M}^{T} \cdot \tilde{u}\_P)\cdot w$$
 
 From $w$, we can derive the attenuation we are seeking:
 
-$$\text{attenuation}=\tilde{M}'w$$
+$$\text{PowerAttenuation}=clamp(\tilde{M}^{T} w,0,1)$$
 
 Finally, we must account for the zero rows that were removed from $M$. To do this, we define the function $\text{ReconstructRows}(\tilde{u}\_P, M)$, which reinserts zeros at the positions of the discarded rows in $\tilde{u}\_P$. The reconstructed signal, representing the attenuated power, can then be written as:
 
-$$u\_P=\text{ReconstructRows}(\text{Diagonal}(\text{attenuation})\cdot \tilde{u}\_P, M)$$
+$$
+attenuation=\sqrt{\text{ReconstructRows}(\text{PowerAttenuation}, M)}
+$$
 
-### Including Phase Information
+Where the square root is applied element wise.
 
-In addition to the power signal $u\_P$, we introduce the complex-valued signal $u\_{\mathbb{C}}\in\mathbb{C}^m$, which includes both amplitude and phase information. Since the attenuation affects the amplitude of the signal but does not alter its phase, the same attenuation derived from $u\_P$ is applied to $u\_{\mathbb{C}}$.
+The attenuation is then applied to the corresponding column of $X_{\mathbb{C}}$ to create $Y_{\mathbb{C}}$.
 
-The attenuated complex signal can be expressed as:
+The audio output signal is then created as:
 
-$$u\_{\mathbb{C}}=\text{ReconstructRows}(\text{Diagonal}(\text{attenuation})\cdot \tilde{u}\_{\mathbb{C}}, M)$$
+$$
+y_{audio}=antisftf(Y_{\mathbb{C}}, step=\frac{d_U}{2})
+$$
 
-where
-
-$$\tilde{u}\_{\mathbb{C}}=\text{RegularRows}(u\_{\mathbb{C}}, M)$$
-
-represents the version of the complex signal with zero rows removed.
-
-Thus, the derived attenuation ensures that both the power signal $u\_P$ and the complex signal $u\_{\mathbb{C}}$ are processed consistently, maintaining their respective power and phase characteristics.
+Where $antisftr$ simply convert each $fft$ back into the time domain and add overlapping audio segment to reconstruct the cleaned audio signal.
