@@ -515,12 +515,12 @@ $$y=\tilde{M}\cdot \text{Diagonal}(\tilde{M}^{T} \cdot \tilde{u}\_P)\cdot w$$
 
 From $w$, we can derive the attenuation we are seeking:
 
-$$\text{PowerAttenuation}=clamp(\tilde{M}^{T} w,0,1)$$
+$$\text{PowerAttenuation}=\text{ReconstructRows}(clamp(\tilde{M}^{T} w,0,1), M)$$
 
 Finally, we must account for the zero rows that were removed from $M$. To do this, we define the function $\text{ReconstructRows}(\tilde{u}\_P, M)$, which reinserts zeros at the positions of the discarded rows in $\tilde{u}\_P$. The reconstructed signal, representing the attenuated power, can then be written as:
 
 $$
-attenuation=\sqrt{\text{ReconstructRows}(\text{PowerAttenuation}, M)}
+attenuation=[\sqrt{PowerAttenuation_{i,j}}]
 $$
 
 Where the square root is applied element wise.
@@ -534,3 +534,57 @@ y_{audio}=antisftf(Y_{\mathbb{C}}, step=\frac{d_U}{2})
 $$
 
 Where $antisftr$ simply convert each $fft$ back into the time domain and add overlapping audio segment to reconstruct the cleaned audio signal.
+
+---
+
+## Data
+
+The speech data are taken from the [fluent-speech-corpus](https://www.kaggle.com/datasets/tommyngx/fluent-speech-corpus?resource=download). This dataset consists of several speakers pronouncing a set of fixed commands. The speaker ID `7B4XmNppyrCK977p` was selected, and all sentences from this speaker were loaded. Sentences shorter than 2 seconds were discarded.
+
+Noise samples are frog sounds taken from the [Environmental Sound Classification 50](https://www.kaggle.com/datasets/mmoreaux/environmental-sound-classification-50) dataset, which contains samples of various environmental sounds with a fixed duration of 5 seconds.
+
+At this point, the samples are split into 10% [out-of-sample](https://en.wikipedia.org/wiki/Cross-validation_(statistics)) data for verification and 90% [in-sample](https://en.wikipedia.org/wiki/Cross-validation_(statistics)) data for training. Both sets undergo the same processing pipeline.
+
+All data are [sample-rate converted](https://en.wikipedia.org/wiki/Sample-rate_conversion) to a common sample rate of \( f_s = 8192 \text{ Hz} \).
+
+The volume of the samples is set by first applying an \( \alpha \)-filter with adjustable attack/decay time to the Hilbert transform of the data, defining the [envelope](https://en.wikipedia.org/wiki/Envelope_(music)) of the signal. The signal is then amplified or attenuated so that the maximum value of the envelope reaches a fixed level. This level is consistent across both noise and speech signals.
+
+Each noise sample, originally 5 seconds long, is divided into three overlapping parts, each with a duration of 2 seconds.
+
+Finally, the training and validation datasets are created by mixing the frog noise samples with the speech signals in their respective datasets.
+
+---
+
+## training
+
+### Training Loop Description:
+
+The training loop iterates over multiple epochs, where in each epoch it processes all samples in the training set. For each sample, a function (`withmask`) is applied to combine the input data and corresponding mask into the required format for the transformer model. The model's gradients are computed using automatic differentiation, and the parameters are updated accordingly with an optimization algorithm. After each epoch, the model's performance is evaluated on both in-sample and out-of-sample test sets, and the resulting losses are recorded. Progress is logged throughout the process.
+
+```julia
+optimizerstate = Flux.setup(Adam(1e-4), model)
+epochs=1:10
+
+function train!()
+    @info "start training"
+    global losses
+    for epoch in epochs
+        @showprogress for (i,sample) in enumerate(train)
+            input=withmask(sample)
+            ϵ,∇=Flux.withgradient(model, input) do m, s
+                loss(m, s)
+            end
+            Flux.update!(optimizerstate, model, ∇[1])             
+        end
+        ls=[dataloaderloss(test.is) dataloaderloss(test.oos)]
+        println("$epoch: $ls")
+        losses=vcat(losses,ls)
+    end
+end
+ 
+@time train!()
+```
+
+
+
+
