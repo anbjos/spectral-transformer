@@ -199,10 +199,9 @@ function read_noises(data_description, type, path, fs)
     return noises
 end
 
-function dataloader(signals,noises)
-    m=256
-    w=hanning(m+1)[2:m+1]
-    A=mel_filter_bank(26, m, fs, 300, fs/2)
+function dataloader(signals,noises,win)
+    m=length(win)
+    M=mel_filter_bank(26, m, fs, 300, fs/2)
     
     n_noises=length(noises)
     n_signal=length(signals)
@@ -214,18 +213,27 @@ function dataloader(signals,noises)
     for j in 1:n_signal
         for k in 1:n_noises
             jk += 1
-            X[:,:,jk],Y[:,:,jk]=audio_chain(signals[j], noises[k], w, A) 
+            X[:,:,jk],Y[:,:,jk]=audio_chain(signals[j], noises[k], win, M) 
         end
     end
     
     masks=size(X,2)*ones(Int32,size(X,3)) |> todevice
     
-    result=Flux.DataLoader((x=X, y=Y, mask=masks); batchsize=10, shuffle=true);
+    result=Flux.DataLoader((x=X, y=Y, mask=masks); batchsize=16, shuffle=true);
     return result
 end
 
 n_samples=16384
 fs=8192
+win=hanning(256+1)[2:end]
+m=length(win)
+
+f_low=300
+f_high=fs>>1
+M=mel_filter_bank(d_in, m, fs, f_low, f_high)
+
+
+
 noises=read_noises("./data/environmental_sound_classification_50/archive/esc50.csv", "frog", "./data/environmental_sound_classification_50/archive/audio/audio/16000/", fs) |> 
     shuffle_n_split |>
     splits -> overlapping_splits(splits, 16384, 12288)
@@ -233,8 +241,9 @@ noises=read_noises("./data/environmental_sound_classification_50/archive/esc50.c
 signals=read_signals("./data/fluent_speech_commands_dataset/data/test_data.csv", "./data/fluent_speech_commands_dataset/", "7B4XmNppyrCK977p", fs, n_samples) |>
     shuffle_n_split
 
-train=dataloader(signals.train,noises.train)
-test=(oos=dataloader(signals.test,noises.test),is=dataloader(signals.train[1:length(signals.test)], noises.train[1:length(noises.test)]))
+train=dataloader(signals.train,noises.train, win)
+test=(oos=dataloader(signals.test,noises.test, win),is=dataloader(signals.train[1:length(signals.test)], noises.train[1:length(noises.test)], win))
+
 
 #############################################
 

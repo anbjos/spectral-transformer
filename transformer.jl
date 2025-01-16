@@ -20,21 +20,18 @@ using LinearAlgebra
 using PyPlot; pygui(true)
 using CUDA; enable_gpu(CUDA.functional())
 
-include("./read_audio.jl")
-include("./audio_processing.jl")
-
 const TRAIN= false
 
 d_in=26                          # Input data Dimention
 d_out=d_in                       # Output data Dimention
 
-n_layers = 2                     # Number of transformer layers
-n_heads = 8                      # Number of parallel transformer heads
-d_k = 32                         # Dimension of the attention operation d_v=d_q=d_k in Transformer.jl.
+n_layers = 4                     # Number of transformer layers
+n_heads = 8                      # Number of parallel transformer heads (8)
+d_k = 32                         # Dimension of the attention operation d_v=d_q=d_k in Transformer.jl. (32)
 d= n_heads * d_k                 # Hiddeen dim, i.e. embedding, output, internal representation
 d_ffn = 4d                       # Dimention of feed forward layer
 
-encoding_transformer = Transformer(TransformerBlock, n_layers, n_heads, d, d_k, d_ffn) |> todevice
+encoding_transformer = Transformer(TransformerBlock, n_layers, n_heads, d, d_k, d_ffn) |> todevice  #; dropout=10
 
 position_embedding = SinCosPositionEmbed(d)
 projection_layer=Flux.Dense(d_in,d,identity)  |> todevice
@@ -82,10 +79,15 @@ end
 
 #4.83
 
+
+include("./read_audio.jl")
+include("./audio_processing.jl")
+
+
 dataloaderloss(loader, model=model)=mean([loss(model,withmask(batch)) for batch in loader])
 losses=Matrix{Float32}(undef,0,2)
 optimizerstate = Flux.setup(Adam(1e-4), model)
-epochs=1:4
+epochs=1:8
 
 function train!()
     @info "start training"
@@ -103,28 +105,21 @@ function train!()
         losses=vcat(losses,ls)
     end
 end
- 
-@time train!()
-ϵ=loss(model,input)
 
+@time train!()
 
 r=dataloaderloss(test.is, identity)
 plot(losses[:,1]/r)
 r=dataloaderloss(test.oos, identity)
-plot(losses[:,1]/r)
+plot(losses[:,2]/r)
 
-title("baseline\nt=2500s")
+title("h=8d_k=32L=4\nt=5400s,b=16,a=1e-4")
 
 
 legend(["is","oos"])
 grid()
 
-savefig("baseline.pdf")
-
-test
-
-
-xxxxx=loadfig("x.eps")
+savefig("L4.pdf")
 
 dataloaderloss(test.is)
 dataloaderloss(test.is, reference)
@@ -138,16 +133,16 @@ model=reference
 
 dataloaderloss(test.oos)
 
-BSON.@load "signals_n_noises.bson" signals_n_noises
-(signals,noises)=signals_n_noises
-BSON.@load "model.bson" model
+BSON.@load "L4_signals_n_noises.bson" signals_n_noises
+(signals,noises,losses)=signals_n_noises
+BSON.@load "L4_model.bson" model
 model=model |> todevice
 
 model
 
 
 model=Model(model.position_embedding, model.projection, withmask, model.transformer, model.antiprojection) |> cpu
-signals_n_noises=(signals,noises)
+signals_n_noises=(signals,noises,losses)
 using BSON: @save
-@save "model.bson" model
-@save "signals_n_noises.bson" signals_n_noises
+@save "L4_model.bson" model
+@save "L4_signals_n_noises.bson" signals_n_noises

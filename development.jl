@@ -266,3 +266,168 @@ colorbar()
 
 print(plt.colormaps())
 PyPlot.cm
+
+# Audio reconstruction
+
+# Signals and Noises
+
+signals
+noises
+
+# Define various parameters
+
+m=256
+w=hanning(m+1)[2:m+1]
+M=mel_filter_bank(26, m, fs, 300, fs/2)
+
+# Define and process time domain signal
+
+t=signals.test[2]+noises.test[9]
+x=t
+X=stft(x[:], m; fs=fs, window=w)
+XX=spectrogram(X, m; fs=fs, window=w) |> power
+X2=power_chain(X, m, fs, w)|> clip_noise |> U -> freq_chain(U, M)
+
+whiteX2=copy(X2)
+white=whiten!(whiteX2)
+
+figure(figsize=(10, 5))
+imshow(whiteX2, aspect = "auto")
+title("raw whiteX2")
+colorbar()
+
+sample=(x=reshape(whiteX2,26,127,1) |> todevice,y=reshape(whiteX2,26,127,1) |> todevice,mask=[size(whiteX2,2)] |> todevice) |> todevice
+
+
+whiteY2=model(withmask(sample).x ).hidden_state |> cpu
+whiteY2=reshape(whiteY2,size(whiteY2,1),size(whiteY2,2))
+
+figure(figsize=(10, 5))
+imshow(whiteY2, aspect = "auto")
+title("clean whiteY2")
+colorbar()
+
+function antiwhiten!(x,white)
+    x.*=white.scale
+    x.+=white.offset
+    return x
+end
+
+Y2=copy(whiteY2)
+antiwhiten!(Y2,white)
+
+Y2=db2pow.(Y2) #Preserves the information from whiteY2.
+
+println("output to input power ratio: $(sum(Y2)/sum(db2pow.(X2)))")
+
+# select a sftf and compare input and output power spectrum
+p=45
+clf()
+plot(Y2[:,p])
+plot(db2pow.(X2[:,p]))
+title("Linear Power ")
+xlabel("Frequency, MEL logarithmic")
+ylabel("Power")
+
+ignored_columns(W)=[iszero(c) for c in eachcol(W)] |> BitVector
+ic=ignored_columns(M)
+
+U0=XX[:,p][.~ic]
+M0=M[:,.~ic]
+Y0=M0*U0
+Y1=Y2[:,p]
+
+x=(M0*Diagonal(U0)*M0')\Y1
+
+#Verify match att*XX to Y2 in MEL domain. THIS MATCHES
+figure()
+#plot(M0*Diagonal(M0'*x)*U0)
+plot(Y1)     # => Y1=M0*Diagonal(M0'*x)*U0
+att=M0'*x
+plot(M0*(att .* U0),"--") # =Y1
+
+
+# Compare stuff in the power domain - reasonable taken into account that we want to get rid of noise
+figure()
+plot(U0)
+plot((spectrogram(reshape(X[:,p],129,1), m; fs=fs, window=w) |> power)[.~ic],"--")
+
+plot(att .* U0)
+clamp!(att, 0, 1000000)
+btt=zeros(129)
+btt[.~ic]=att
+plot( (spectrogram(reshape(sqrt.(btt) .* X[:,p],129,1), m; fs=fs, window=w) |> power)[.~ic],"--")
+
+
+
+R=similar(X)
+for p in 1:size(X,2)
+    U0=XX[:,p][.~ic]  # ̃x regular version of this input
+    M0=M[:,.~ic]      # ̃M regular version of M
+    Y0=M0*U0          # ̃y0 regular version of input
+    Y1=Y2[:,p]         # y1 regular version of output
+    x=(M0*Diagonal(U0)*M0')\Y1  #use w for weights
+
+    att=M0'*x            #PowerAttenuation
+    clamp!(att, 0, 1)
+    btt=zeros(129)        # attenuation
+    btt[.~ic]=att
+    R[:,p]=sqrt.(btt) .* X[:,p]  # Result
+end
+
+
+
+#R matches Y1 in the power domain
+p=45
+figure()
+#plot(M0*Diagonal(M0'*x)*U0)
+Y1=Y2[:,p]
+plot(Y1)     # => Y1=M0*Diagonal(M0'*x)*U0
+plot(M*(spectrogram(reshape(R[:,p],129,1), m; fs=fs, window=w) |> power),"--")
+
+#!!! NOW CHECK MAP FROM Y2'S WITH MAP FROM R
+
+# Can I regenerate my color map from Y2 alone?
+
+Q=copy(Y2)
+Q=pow2db.(Q)
+whiten!(Q)
+
+figure(figsize=(10, 5))
+imshow(Q, aspect = "auto")
+title("white NS out")
+colorbar()
+
+# Same process starting from R, seems like it, what was the problem?
+
+RR=spectrogram(R, m; fs=fs, window=w) |> power
+R2=M*RR
+RW=copy(R2)
+RW=pow2db.(RW)
+whiten!(RW)
+figure(figsize=(10, 5))
+imshow(RW, aspect = "auto")
+
+
+R
+
+fullcircle(X)=vcat(X,conj.(X[end-1:-1:2]))
+
+function antistft(X)
+    m=2(size(X,1)-1)
+    n=size(X,2)
+    l=m*n-(n-1)*m>>1
+    result=zeros(Complex,l)
+    p=1
+    for k in 1:n
+        result[p:p+m-1]+=ifft(fullcircle(X[:,k]))
+        p+=m>>1
+    end
+    return result
+end
+
+y=real.(antistft(R))
+
+sound(y, fs)
+sound(t, fs)
+
