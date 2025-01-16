@@ -543,7 +543,7 @@ The speech data are taken from the [fluent-speech-corpus](https://www.kaggle.com
 
 Noise samples are frog sounds taken from the [Environmental Sound Classification 50](https://www.kaggle.com/datasets/mmoreaux/environmental-sound-classification-50) dataset, which contains samples of various environmental sounds with a fixed duration of 5 seconds.
 
-At this point, the samples are split into 10% [out-of-sample](https://en.wikipedia.org/wiki/Cross-validation_(statistics)) data for verification and 90% [in-sample](https://en.wikipedia.org/wiki/Cross-validation_(statistics)) data for training. Both sets undergo the same processing pipeline.
+At this point, the samples are first shuffled and then split into 10% [out-of-sample](https://en.wikipedia.org/wiki/Cross-validation_(statistics)) data for verification and 90% [in-sample](https://en.wikipedia.org/wiki/Cross-validation_(statistics)) data for training. Both sets undergo the same processing pipeline.
 
 All data are [sample-rate converted](https://en.wikipedia.org/wiki/Sample-rate_conversion) to a common sample rate of \( f_s = 8192 \text{ Hz} \).
 
@@ -564,6 +564,14 @@ The training loop iterates over multiple epochs, where in each epoch it processe
 ```julia
 optimizerstate = Flux.setup(Adam(1e-4), model)
 epochs=1:10
+
+function loss(model, input)
+    y=input.y
+    x=input.x
+    ŷ=model(x)
+    mask=ŷ.attention_mask
+    return Flux.mse(mask .*y, mask .* ŷ.hidden_state)
+end
 
 function train!()
     @info "start training"

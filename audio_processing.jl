@@ -9,16 +9,8 @@
 #using CUDA
 #using Transformers
 
-using Sound
-using WAV
-using DSP
-using FFTW
 
-using LinearAlgebra
-
-using PyPlot; pygui(true)
-
-function envelope(u, fs, τ_attack=0.01, τ_decay=0.1)
+#= function envelope(u, fs, τ_attack=0.01, τ_decay=0.1)
     α_attack = exp(-1 / (fs * τ_attack))
     α_decay = exp(-1 / (fs * τ_decay))
     
@@ -40,7 +32,7 @@ function normalize!(u,fs,target_ampl=0.1)
     u .*= gain
     return u
 end
-
+ =#
 import DSP.Periodograms.spectrogram
 
 function DSP.Periodograms.spectrogram(X::AbstractMatrix{T}, n::Int=ispow2(size(X,1)) ? size(X,1) : 2size(X,1)-2, noverlap::Int=n>>1;
@@ -120,8 +112,8 @@ function clip_noise(X::AbstractMatrix,Y::AbstractMatrix, threshold=-60)
     return X,Y
 end
 
-time_chain(u, fs, n=length(u)) = normalize!(u,fs) |> 
-                u -> u[1:n,1:1] 
+# time_chain(u, fs, n=length(u)) = normalize!(u,fs) |> 
+#                 u -> u[1:n,1:1] 
 
 freq_chain(U, A) = U |> U -> A*U |>
                 U -> pow2db.(U)
@@ -225,8 +217,8 @@ function dataloader(signals,noises)
             X[:,:,jk],Y[:,:,jk]=audio_chain(signals[j], noises[k], w, A) 
         end
     end
-    masks=size(X,2)*ones(Int32,size(X,3)) |> todevice
     
+    masks=size(X,2)*ones(Int32,size(X,3)) |> todevice
     
     result=Flux.DataLoader((x=X, y=Y, mask=masks); batchsize=10, shuffle=true);
     return result
@@ -242,12 +234,11 @@ signals=read_signals("./data/fluent_speech_commands_dataset/data/test_data.csv",
     shuffle_n_split
 
 train=dataloader(signals.train,noises.train)
-test=dataloader(signals.test,noises.test)
-
+test=(oos=dataloader(signals.test,noises.test),is=dataloader(signals.train[1:length(signals.test)], noises.train[1:length(noises.test)]))
 
 #############################################
 
-sample=first(test)
+#= sample=first(test)
 sample1=(x=sample.x[:,:,1:1],y=sample.y[:,:,1:1],mask=sample.mask[1:1])
 input=withmask(sample1)
 input=withmask(sample)
@@ -336,3 +327,4 @@ size(Y__hat.y)
 
 figure(figsize=(10, 5))
 imshow(Y_, aspect = "auto")
+ =#

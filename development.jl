@@ -94,8 +94,14 @@ function mel_filter_bank(num_filters, fft_size, sample_rate, min_freq, max_freq)
     return filter_bank
 end
 
-A=mel_filter_bank(10, 512, 16000, 300, 8000)
+A=mel_filter_bank(10, 252, 8000, 300, 4000)
 [plot(r) for r in eachrow(A)] # compare with http://practicalcryptography.com/miscellaneous/machine-learning/guide-mel-frequency-cepstral-coefficients-mfccs/
+
+
+title("MEL filter bank")
+ylabel("weight")
+xlabel("stft bin")
+legend(["row $k" for k in 1:10];loc="lower right")
 
 # Investigate from DSP's stft to spectrogram
 

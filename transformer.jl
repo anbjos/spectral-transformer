@@ -9,12 +9,21 @@ using CSV, BSON # , JSON
 using Functors
 using BenchmarkTools
 using Random
+using ProgressMeter
 
+using Sound
+using WAV
+using DSP
+using FFTW
+using LinearAlgebra
+
+using PyPlot; pygui(true)
 using CUDA; enable_gpu(CUDA.functional())
 
-#############################################
-#RUN TRAINING DATA
-#############################################
+include("./read_audio.jl")
+include("./audio_processing.jl")
+
+const TRAIN= false
 
 d_in=26                          # Input data Dimention
 d_out=d_in                       # Output data Dimention
@@ -67,40 +76,78 @@ function loss(model, input)
     return Flux.mse(mask .*y, mask .* ŷ.hidden_state)
 end
 
+
 #sample=first(test)
 #loss(model,withmask(sample))
 
 #4.83
 
+dataloaderloss(loader, model=model)=mean([loss(model,withmask(batch)) for batch in loader])
+losses=Matrix{Float32}(undef,0,2)
 optimizerstate = Flux.setup(Adam(1e-4), model)
+epochs=1:4
 
 function train!()
     @info "start training"
-    for epoch in 1:3
-        for (i,sample) in enumerate(train)
+    global losses
+    for epoch in epochs
+        @showprogress for (i,sample) in enumerate(train)
             input=withmask(sample)
             ϵ,∇=Flux.withgradient(model, input) do m, s
                 loss(m, s)
             end
-            if i % 16 == 0 
-                t=loss(model,withmask(first(test)))
-                println("p= $(i/length(train)/3+(epoch-1)/3), ϵ=$ϵ, t = $t")
-            end
             Flux.update!(optimizerstate, model, ∇[1])             
         end
+        ls=[dataloaderloss(test.is) dataloaderloss(test.oos)]
+        println("$epoch: $ls")
+        losses=vcat(losses,ls)
     end
 end
  
 @time train!()
 ϵ=loss(model,input)
 
+
+r=dataloaderloss(test.is, identity)
+plot(losses[:,1]/r)
+r=dataloaderloss(test.oos, identity)
+plot(losses[:,1]/r)
+
+title("baseline\nt=2500s")
+
+
+legend(["is","oos"])
+grid()
+
+savefig("baseline.pdf")
+
+test
+
+
+xxxxx=loadfig("x.eps")
+
+dataloaderloss(test.is)
+dataloaderloss(test.is, reference)
+dataloaderloss(test.is, model)
+dataloaderloss(test.is, identity)
+
+reference=model
+
+model=reference
+
+
+dataloaderloss(test.oos)
+
 BSON.@load "signals_n_noises.bson" signals_n_noises
 (signals,noises)=signals_n_noises
-BSON.@load "mymodel.bson" model
+BSON.@load "model.bson" model
 model=model |> todevice
+
+model
+
 
 model=Model(model.position_embedding, model.projection, withmask, model.transformer, model.antiprojection) |> cpu
 signals_n_noises=(signals,noises)
 using BSON: @save
-@save "mymodel.bson" model
+@save "model.bson" model
 @save "signals_n_noises.bson" signals_n_noises
