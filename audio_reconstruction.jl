@@ -5,7 +5,6 @@ noises
 
 # Define various parameters
 
-
 function wrapped_model(U::Matrix)
     (m,n)=size(U)
     sample=(x=reshape(U,m,n,1) |> todevice,y=reshape(U,m,n,1) |> todevice,mask=[size(U,2)] |> todevice) |> todevice
@@ -37,36 +36,162 @@ end
 
 
 regular_columns(W)=[~iszero(c) for c in eachcol(W)] |> BitVector
-rc=regular_columns(M)
 
+function attenuations(X2,MY2,M)
+    attenuations=zeros(eltype(X2),size(X2))
+    rc=regular_columns(M)
+    M=view(M,:,rc)
+    X2=view(X2,rc,:)
+    for p in 1:size(X2,2)
+        u=X2[:,p]
+        y=MY2[:,p]
+        w=(M*Diagonal(u)*M')\y
+        attenuation2=M'*w
+        clamp!(attenuation2, 0, 1)
+        attenuations[rc,p]=sqrt.(attenuation2)
+    end
+    return attenuations
+end
 
 
 # Define and process time domain signal
 
-x=signals.test[2]+noises.test[9]
+function withintermediate(model,fs,win,u,white=nothing)
+    m=length(win)
+    X=stft(u[:], m; fs=fs, window=win)
+    X2=spectrogram(X, m; fs=fs, window=win) |> power
+    MX2=power_chain(X, m, fs, win)|> clip_noise |> U -> freq_chain(U, M)
+    
+    whiteMX2=copy(MX2)
+    white=whiten!(whiteMX2,white)
+    
+    whiteMY2=wrapped_model(whiteMX2)
+    MY2=copy(whiteMY2)
+    antiwhiten!(MY2,white)
+    MY2=db2pow.(MY2) 
+
+    println("hi")
+    
+    att=ones(eltype(X2),size(X2))
+    try
+        att=attenuations(X2,MY2,M)
+    catch e
+        nothing
+    end
+    
+    y=real.(antistft(att .* X))
+    return y,X,X2,MX2,whiteMX2,whiteMY2,white,att
+end
+
+
+
+function suppressnoise(model,fs,win,u)
+    y,_,_,_,_,_,_,_=withintermediate(model,fs,win,u)
+    return y
+end
+
+u=signals.test[3]+noises.test[1]
+y=suppressnoise(model,fs,win,u)
+
+sound(y, fs)
+sound(u, fs)
+
+
+
+withintermediate(model,fs,win,signals.test[1]+noises.test[2])
+withintermediate(model,fs,win,signals.test[5])
+
+
+####################################
+# Check if performance is better with phase defined from the signal input
+# it is not, so phase quality reduction from frogs is not degrading performance much
+# Conclusion: the degradation in quality is due to imperfection in the attenuation
+
+u=signals.test[3]
+uu=u+noises.test[1]
+
+_,ref,_,_,_,_,_,att=withintermediate(model,fs,win,u)
+ph=copy(ref)
+ph[abs.(ph) .< 256eps(eltype(real.(ph)))] .= 1
+
+y,X,X2,MX2,whiteMX2,whiteMY2,white,att=withintermediate(model,fs,win,uu)
+
+X=abs.(X) .* (ph./(abs.(ph)))
+yy=real.(antistft(att .* X))
+
+sound(y, fs)
+sound(yy, fs)
+sound(u, fs)
+sound(uu, fs)
+
+btt=abs.(ref) ./ abs.(X)
+clamp!(btt,0.01,1)
+yyy=real.(antistft(btt .* X))
+sound(yyy, fs)
+
+
+
+clf()
+p=80
+plot(att[:,p])
+plot(btt[:,p])
+title("ideal att not very smooth")
+
+clf()
+plot((M*abs2.(att .* X))[:,p])
+plot((M*abs2.(btt .* X))[:,p])
+
+
+
+
+
+#NOT working (trying to smooth out att)
+using DSP
+for c in 1:127
+    att[:,c]=DSP.conv([1,1,1,1,1],att[:,c])[3:end-2]
+end
+
+
+
+
+
+
+###################################################
+# Check if performance is reduced due to the dimention reduction
+# Use ideal model result (=signal without noise) to define attenuations
+# Run with d_in as free parameter
+
+d_in=52
+
+ps,pn=5,4
+
+M=mel_filter_bank(d_in, m, fs, f_low, f_high)
+
+x=signals.test[ps]+noises.test[pn]
 X=stft(x[:], m; fs=fs, window=win)
 X2=spectrogram(X, m; fs=fs, window=win) |> power
 MX2=power_chain(X, m, fs, win)|> clip_noise |> U -> freq_chain(U, M)
 
 whiteMX2=copy(MX2)
-white=whiten!(whiteMX2)
+white=whiten!(whiteMX2,nothing)
 
-whiteMY2=wrapped_model(whiteMX2)
-MY2=copy(whiteMY2)
-antiwhiten!(MY2,white)
+x_=signals.test[ps]
+X_=stft(x_[:], m; fs=fs, window=win)
+X2_=spectrogram(X_, m; fs=fs, window=win) |> power
+MX2_=power_chain(X_, m, fs, win)|> clip_noise |> U -> freq_chain(U, M)
+
+MY2=MX2_
 
 MY2=db2pow.(MY2) 
 
-
-
-
-rc
+rc=regular_columns(M)
 
 X2=view(X2,rc,:)
 M=view(M,:,rc)
 
 
-attenuations=similar(X)
+att=zeros(eltype(X),size(X))
+
 
 for p in 1:size(X,2)
     u=X2[:,p]
@@ -74,11 +199,11 @@ for p in 1:size(X,2)
     w=(M*Diagonal(u)*M')\y
     attenuation2=M'*w
     clamp!(attenuation2, 0, 1)
-    attenuations[rc,p]=sqrt.(attenuation2)
+    att[rc,p]=sqrt.(attenuation2)
 end
 
 
-R=attenuations .* X
+R=att .* X
 
 y=real.(antistft(R))
 
@@ -86,31 +211,9 @@ sound(y, fs)
 sound(x, fs)
 
 
-###################################################
+sound(signals.test[ps],fs)
 
-
-̃x =X2[rc,p]  # ̃x regular version of this input
-
-
-
-
-
-̃M=M[:,rc]
-y=MY2[:,p]
-
-w=(̃M*Diagonal(̃x)*̃M')\y  #use w for weights
-
-powerattenuation= ̃M'*w            #PowerAttenuatio
-clamp!(powerattenuation, 0, 1)
-attenuation=zeros(129)        # attenuation
-attenuation[rc]=sqrt.(att)
-
-
-
-R[:,p]=sqrt.(btt) .* X[:,p]  # Result
-
-
-
+###############################
 
 figure(figsize=(10, 5))
 imshow(whiteMX2, aspect = "auto")

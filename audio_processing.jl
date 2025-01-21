@@ -1,38 +1,3 @@
-#using Pkg
-#Pkg.activate(".")
-
-#using Flux, Statistics, ProgressMeter
-#using CUDA
-#using JSON
-#using CSV
-#using Random
-#using CUDA
-#using Transformers
-
-
-#= function envelope(u, fs, τ_attack=0.01, τ_decay=0.1)
-    α_attack = exp(-1 / (fs * τ_attack))
-    α_decay = exp(-1 / (fs * τ_decay))
-    
-    abs_u = abs.(hilbert(u))
-    result=similar(abs_u)
-    result[1]=0
-    
-    for k in 2:length(result)
-        α=abs_u[k] > result[k-1] ? α_attack : α_decay
-        result[k]= α * abs_u[k-1] + (1 - α) * abs_u[k]
-    end
-    return result
-end
-
-function normalize!(u,fs,target_ampl=0.1)
-    env=envelope(u,fs)
-    mx=maximum(env)
-    gain=target_ampl/mx
-    u .*= gain
-    return u
-end
- =#
 import DSP.Periodograms.spectrogram
 
 function DSP.Periodograms.spectrogram(X::AbstractMatrix{T}, n::Int=ispow2(size(X,1)) ? size(X,1) : 2size(X,1)-2, noverlap::Int=n>>1;
@@ -81,7 +46,7 @@ function mel_filter_bank(num_filters, fft_size, sample_rate, min_freq, max_freq)
     return filter_bank
 end
 
-function whiten!(x,y)
+function whiten!(x::Matrix,y::Matrix)
     offset=mean(x)
     x.-=offset
     y.-=offset
@@ -91,7 +56,13 @@ function whiten!(x,y)
     return (offset=offset,scale=scale)
 end
 
-function whiten!(x)
+function whiten!(x::Matrix,white)
+    x.-=white.offset
+    x./=white.scale
+    return white
+end
+
+function whiten!(x::Matrix, w::Nothing)
     offset=mean(x)
     x.-=offset
     scale=std(x[:])
@@ -142,72 +113,15 @@ function audio_chain(signal, noise, w, A)
     return X,Y
 end
 
-function read_signals(data_description, path, speaker, fs, n_samples)
-    signal_files=CSV.read(data_description, identity)
-    filtered_files=signal_files.path[signal_files.speakerId .== speaker]
-    
-    signals=Vector{Matrix{Float64}}()
-    for filename in filtered_files
-        u,fs_in=wavread(path*filename)
-        if length(u) >= 2fs_in
-            u=resample(u,fs/fs_in;dims=1) 
-            u=time_chain(u, fs, n_samples)
-            push!(signals,u)
-        end
-    end
-    return signals
-end
-
-function shuffle_n_split(data, testpercentage=10)
-    n=length(data)
-    p=randperm(n)
-    permute!(data,p)
-    split=floor(Int64,n*testpercentage/100)
-    return (all=data, train=view(data,split+1:n), test=view(data,1:split))
-end
-
-function overlapping_splits(v::AbstractVector, n::Int, step::Int)
-    result=Vector{eltype(v)}()
-    for elem in v
-        thru=n 
-        while thru<=length(elem)
-            from=thru-n+1
-            push!(result,view(elem,from:thru,1:1))
-            thru+=step
-        end
-    end
-    return result
-end
-
-function overlapping_splits(namedtuple::NamedTuple, args...)
-    result=map(t -> overlapping_splits(t, args...),values(namedtuple))
-    return NamedTuple{keys(namedtuple)}(result)
-end
-
-function read_noises(data_description, type, path, fs)
-    noises=Vector{Matrix{Float64}}()
-    noise_files=CSV.read(data_description, identity)
-    p=findfirst(s -> s==type, noise_files.category)
-    t=noise_files.target[p]
-    filtered_noise_files=noise_files.filename[noise_files.target .== t]
-    for filename in filtered_noise_files
-        u,fs_in = wavread(path*filename)
-        u= resample(u, fs/fs_in; dims=1) 
-        u= time_chain(u, fs)
-        push!(noises,u)
-    end
-    return noises
-end
-
-function dataloader(signals,noises,win)
+function dataloader(signals,noises,win,d_in)
     m=length(win)
-    M=mel_filter_bank(26, m, fs, 300, fs/2)
+    M=mel_filter_bank(d_in, m, fs, 300, fs/2)
     
     n_noises=length(noises)
     n_signal=length(signals)
     
-    X=Array{Float64, 3}(undef, 26, 127, n_noises*n_signal) |> todevice
-    Y=Array{Float64, 3}(undef, 26, 127, n_noises*n_signal) |> todevice
+    X=Array{Float64, 3}(undef, d_in, 127, n_noises*n_signal) |> todevice
+    Y=Array{Float64, 3}(undef, d_in, 127, n_noises*n_signal) |> todevice
     
     jk=0
     for j in 1:n_signal
@@ -219,7 +133,7 @@ function dataloader(signals,noises,win)
     
     masks=size(X,2)*ones(Int32,size(X,3)) |> todevice
     
-    result=Flux.DataLoader((x=X, y=Y, mask=masks); batchsize=16, shuffle=true);
+    result=Flux.DataLoader((x=X, y=Y, mask=masks); batchsize=8, shuffle=true);
     return result
 end
 
@@ -241,8 +155,8 @@ noises=read_noises("./data/environmental_sound_classification_50/archive/esc50.c
 signals=read_signals("./data/fluent_speech_commands_dataset/data/test_data.csv", "./data/fluent_speech_commands_dataset/", "7B4XmNppyrCK977p", fs, n_samples) |>
     shuffle_n_split
 
-train=dataloader(signals.train,noises.train, win)
-test=(oos=dataloader(signals.test,noises.test, win),is=dataloader(signals.train[1:length(signals.test)], noises.train[1:length(noises.test)], win))
+train=dataloader(signals.train,noises.train, win, d_in)
+test=(oos=dataloader(signals.test,noises.test, win, d_in),is=dataloader(signals.train[1:length(signals.test)], noises.train[1:length(noises.test)], win, d_in))
 
 
 #############################################

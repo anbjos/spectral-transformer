@@ -25,7 +25,7 @@ const TRAIN= false
 d_in=26                          # Input data Dimention
 d_out=d_in                       # Output data Dimention
 
-n_layers = 4                     # Number of transformer layers
+n_layers = 2                     # Number of transformer layers
 n_heads = 8                      # Number of parallel transformer heads (8)
 d_k = 32                         # Dimension of the attention operation d_v=d_q=d_k in Transformer.jl. (32)
 d= n_heads * d_k                 # Hiddeen dim, i.e. embedding, output, internal representation
@@ -87,7 +87,7 @@ include("./audio_processing.jl")
 dataloaderloss(loader, model=model)=mean([loss(model,withmask(batch)) for batch in loader])
 losses=Matrix{Float32}(undef,0,2)
 optimizerstate = Flux.setup(Adam(1e-4), model)
-epochs=1:8
+epochs=1:2
 
 function train!()
     @info "start training"
@@ -144,5 +144,5 @@ model
 model=Model(model.position_embedding, model.projection, withmask, model.transformer, model.antiprojection) |> cpu
 signals_n_noises=(signals,noises,losses)
 using BSON: @save
-@save "L4_model.bson" model
-@save "L4_signals_n_noises.bson" signals_n_noises
+@save "model.bson" model
+@save "signals_n_noises.bson" signals_n_noises
