@@ -20,14 +20,14 @@ using LinearAlgebra
 using PyPlot; pygui(true)
 using CUDA; enable_gpu(CUDA.functional())
 
-const TRAIN= false
+const TRAIN= true
 
-d_in=26                          # Input data Dimention
+d_in=129                          # Input data Dimention
 d_out=d_in                       # Output data Dimention
 
 n_layers = 2                     # Number of transformer layers
-n_heads = 8                      # Number of parallel transformer heads (8)
-d_k = 32                         # Dimension of the attention operation d_v=d_q=d_k in Transformer.jl. (32)
+n_heads = 4                      # Number of parallel transformer heads (8)
+d_k = 64                         # Dimension of the attention operation d_v=d_q=d_k in Transformer.jl. (32)
 d= n_heads * d_k                 # Hiddeen dim, i.e. embedding, output, internal representation
 d_ffn = 4d                       # Dimention of feed forward layer
 
@@ -61,10 +61,6 @@ function (model::Model)(input)
     return result
 end
 
-#sample=first(train)
-#input=withmask(sample)
-#model(input.x)
-
 function loss(model, input)
     y=input.y
     x=input.x
@@ -73,21 +69,16 @@ function loss(model, input)
     return Flux.mse(mask .*y, mask .* ŷ.hidden_state)
 end
 
-
-#sample=first(test)
-#loss(model,withmask(sample))
-
-#4.83
-
-
+Random.seed!(7) 
 include("./read_audio.jl")
 include("./audio_processing.jl")
 
-
 dataloaderloss(loader, model=model)=mean([loss(model,withmask(batch)) for batch in loader])
-losses=Matrix{Float32}(undef,0,2)
-optimizerstate = Flux.setup(Adam(1e-4), model)
-epochs=1:2
+losses=[dataloaderloss(test.is, identity) dataloaderloss(test.oos, identity)]
+println("0: $losses")
+
+optimizerstate = Flux.setup(Adam(5e-4), model)
+epochs=1:6
 
 function train!()
     @info "start training"
@@ -106,43 +97,28 @@ function train!()
     end
 end
 
-@time train!()
+if TRAIN
+    @time train!()
+    model=Model(model.position_embedding, model.projection, withmask, model.transformer, model.antiprojection) |> cpu
+    signals_n_noises=(signals,noises,losses)
+    BSON.@save "model.bson" model
+    BSON.@save "signals_n_noises.bson" signals_n_noises
+    model=model |> todevice
+else
+    BSON.@load "signals_n_noises.bson" signals_n_noises
+    (signals,noises,losses)=signals_n_noises
+    BSON.@load "model.bson" model
+    model=model |> todevice
+end
 
-r=dataloaderloss(test.is, identity)
-plot(losses[:,1]/r)
-r=dataloaderloss(test.oos, identity)
-plot(losses[:,2]/r)
+clf()
+plot(losses[2:end,1]./losses[1,1])
+plot(losses[2:end,2]./losses[1,2])
 
-title("h=8d_k=32L=4\nt=5400s,b=16,a=1e-4")
-
-
+title("Training loss")
 legend(["is","oos"])
+ylabel("loss")
+xlabel("epoch")
 grid()
 
-savefig("L4.pdf")
-
-dataloaderloss(test.is)
-dataloaderloss(test.is, reference)
-dataloaderloss(test.is, model)
-dataloaderloss(test.is, identity)
-
-reference=model
-
-model=reference
-
-
-dataloaderloss(test.oos)
-
-BSON.@load "L4_signals_n_noises.bson" signals_n_noises
-(signals,noises,losses)=signals_n_noises
-BSON.@load "L4_model.bson" model
-model=model |> todevice
-
-model
-
-
-model=Model(model.position_embedding, model.projection, withmask, model.transformer, model.antiprojection) |> cpu
-signals_n_noises=(signals,noises,losses)
-using BSON: @save
-@save "model.bson" model
-@save "signals_n_noises.bson" signals_n_noises
+savefig("training.png")

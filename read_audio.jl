@@ -22,10 +22,8 @@ function normalize!(u,fs,target_ampl=0.25)
     return u
 end
 
-
 time_chain(u, fs, n=length(u)) = normalize!(u,fs) |> 
                 u -> u[1:n,1:1] 
-
 
 function read_signals(data_description, path, speaker, fs, n_samples)
     signal_files=CSV.read(data_description, identity)
@@ -84,12 +82,13 @@ function read_noises(data_description, type, path, fs)
     return noises
 end
 
-
 n_samples=16384
+stepsize=12288
 fs=8192
+
 noises=read_noises("./data/environmental_sound_classification_50/archive/esc50.csv", "frog", "./data/environmental_sound_classification_50/archive/audio/audio/16000/", fs) |> 
     shuffle_n_split |>
-    splits -> overlapping_splits(splits, 16384, 12288)
+    splits -> overlapping_splits(splits, n_samples, stepsize)
 
 signals=read_signals("./data/fluent_speech_commands_dataset/data/test_data.csv", "./data/fluent_speech_commands_dataset/", "7B4XmNppyrCK977p", fs, n_samples) |>
     shuffle_n_split

@@ -46,6 +46,15 @@ function mel_filter_bank(num_filters, fft_size, sample_rate, min_freq, max_freq)
     return filter_bank
 end
 
+function filter_bank(num_filters, fft_size, args...)
+    if num_filters == (fft_size ÷ 2)+1
+        result=Diagonal(ones(num_filters))
+    else
+        result=mel_filter_bank(num_filters, args...)
+    end
+    return result
+end
+
 function whiten!(x::Matrix,y::Matrix)
     offset=mean(x)
     x.-=offset
@@ -83,9 +92,6 @@ function clip_noise(X::AbstractMatrix,Y::AbstractMatrix, threshold=-60)
     return X,Y
 end
 
-# time_chain(u, fs, n=length(u)) = normalize!(u,fs) |> 
-#                 u -> u[1:n,1:1] 
-
 freq_chain(U, A) = U |> U -> A*U |>
                 U -> pow2db.(U)
 
@@ -113,15 +119,17 @@ function audio_chain(signal, noise, w, A)
     return X,Y
 end
 
-function dataloader(signals,noises,win,d_in)
+function dataloader(signals,noises,win,M; kwargs...)
     m=length(win)
-    M=mel_filter_bank(d_in, m, fs, 300, fs/2)
-    
+    d_in=size(M,1)
+    n_samples=length(signals[1])
+    n_steps=2(n_samples ÷ m)-1
+
     n_noises=length(noises)
     n_signal=length(signals)
-    
-    X=Array{Float64, 3}(undef, d_in, 127, n_noises*n_signal) |> todevice
-    Y=Array{Float64, 3}(undef, d_in, 127, n_noises*n_signal) |> todevice
+
+    X=Array{Float64, 3}(undef, d_in, n_steps, n_noises*n_signal) |> todevice
+    Y=Array{Float64, 3}(undef, d_in, n_steps, n_noises*n_signal) |> todevice
     
     jk=0
     for j in 1:n_signal
@@ -133,121 +141,19 @@ function dataloader(signals,noises,win,d_in)
     
     masks=size(X,2)*ones(Int32,size(X,3)) |> todevice
     
-    result=Flux.DataLoader((x=X, y=Y, mask=masks); batchsize=8, shuffle=true);
+    result=Flux.DataLoader((x=X, y=Y, mask=masks); kwargs...);
     return result
 end
 
-n_samples=16384
-fs=8192
 win=hanning(256+1)[2:end]
 m=length(win)
 
 f_low=300
 f_high=fs>>1
-M=mel_filter_bank(d_in, m, fs, f_low, f_high)
+M=filter_bank(d_in, m, fs, f_low, f_high)
 
+batchsize=32
 
-
-noises=read_noises("./data/environmental_sound_classification_50/archive/esc50.csv", "frog", "./data/environmental_sound_classification_50/archive/audio/audio/16000/", fs) |> 
-    shuffle_n_split |>
-    splits -> overlapping_splits(splits, 16384, 12288)
-
-signals=read_signals("./data/fluent_speech_commands_dataset/data/test_data.csv", "./data/fluent_speech_commands_dataset/", "7B4XmNppyrCK977p", fs, n_samples) |>
-    shuffle_n_split
-
-train=dataloader(signals.train,noises.train, win, d_in)
-test=(oos=dataloader(signals.test,noises.test, win, d_in),is=dataloader(signals.train[1:length(signals.test)], noises.train[1:length(noises.test)], win, d_in))
-
-
-#############################################
-
-#= sample=first(test)
-sample1=(x=sample.x[:,:,1:1],y=sample.y[:,:,1:1],mask=sample.mask[1:1])
-input=withmask(sample1)
-input=withmask(sample)
-ŷ=model(input.x)
-
-
-figure(figsize=(10, 5))
-imshow(sample1.x[:,:,1], aspect = "auto")
-colorbar()
-
-
-figure(figsize=(10, 5))
-imshow(sample1.y[:,:,1], aspect = "auto")
-colorbar()
-
-
-figure(figsize=(10, 5))
-imshow(ŷ.hidden_state[:,:,1], aspect = "auto")
-colorbar()
-
-figure(figsize=(10, 5))
-imshow(X[:,:,10], aspect = "auto")
-colorbar()
-
-figure(figsize=(10, 5))
-imshow(Y[:,:,10], aspect = "auto")
-colorbar()
-
-p=10
-frog_sound=frog_sounds[p]
-speaker_talk=speaker_talks[p]
-sound(speaker_talk, fs)
-
-
-M=size(X,2)*ones(Int32,size(X,3)) |> todevice
-
-dl=Flux.DataLoader((x=X, y=Y, mask=M); batchsize=10, shuffle=true);
-
-
-figure(figsize=(10, 5))
-imshow(X[:,:,10], aspect = "auto")
-colorbar()
-
-
-
-sample=first(dl)
-input=withmask(sample)
-y_=model(input.x)
-
-figure(figsize=(10, 5))
-imshow(input.x.hidden_state[:,:,1], aspect = "auto")
-
-
-
-figure(figsize=(10, 5))
-imshow(input.y[:,:,1], aspect = "auto")
-
-figure(figsize=(10, 5))
-
-]
-
-imshow(y_.hidden_state[:,:,1], aspect = "auto")
-
-
-
-sample=first(dl)
-sample.x
-
-
-input=withmask(sample)
-model(input.x)
-
-figure(figsize=(10, 5))
-withmask(X[:,:,10])
-
-
-X_=X[:,:,10:10]
-Y_=Y[:,:,10:10]
-M_=size(X_,2)*ones(Int32,size(X_,3)) |> todevice
-
-Y__hat=model=(withmask((x=X_,y=Y_,mask=M_)))
-figure(figsize=(10, 5))
-imshow(Y__hat.y, aspect = "auto")
-
-size(Y__hat.y)
-
-figure(figsize=(10, 5))
-imshow(Y_, aspect = "auto")
- =#
+train=dataloader(signals.train,noises.train, win, M; batchsize=batchsize, shuffle=true)
+test=(oos=dataloader(signals.test,noises.test, win, M; batchsize=batchsize, shuffle=true),
+      is= dataloader(signals.train[1:length(signals.test)], noises.train[1:length(noises.test)], win, M; batchsize=batchsize, shuffle=true))
