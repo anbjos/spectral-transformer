@@ -106,9 +106,9 @@ savefig("with_noise.png")
 
 y=suppressnoise(model,fs,win,u)
 
-wavwrite(y,"result.wav";Fs=8192)
-wavwrite(u,"with_noise.wav";Fs=8192)
-wavwrite(signal,"signal.wav";Fs=8192)
+wavwrite(vcat(y,zeros(fs)),"result.wav";Fs=8192)
+wavwrite(vcat(u,zeros(fs)),"with_noise.wav";Fs=8192)
+wavwrite(vcat(signal,zeros(fs)),"signal.wav";Fs=8192)
 
 sound(y, fs) # 
 sound(u, fs)

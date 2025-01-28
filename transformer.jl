@@ -22,10 +22,10 @@ using CUDA; enable_gpu(CUDA.functional())
 
 const TRAIN= true
 
-d_in=129                          # Input data Dimention
+d_in=129                         # Input data Dimention
 d_out=d_in                       # Output data Dimention
 
-n_layers = 2                     # Number of transformer layers
+n_layers = 4                     # Number of transformer layers
 n_heads = 4                      # Number of parallel transformer heads (8)
 d_k = 64                         # Dimension of the attention operation d_v=d_q=d_k in Transformer.jl. (32)
 d= n_heads * d_k                 # Hiddeen dim, i.e. embedding, output, internal representation
@@ -73,12 +73,37 @@ Random.seed!(7)
 include("./read_audio.jl")
 include("./audio_processing.jl")
 
+n_samples=16384
+stepsize=12288
+fs=8192
+
+noises=read_noises("./data/environmental_sound_classification_50/archive/esc50.csv", "frog", "./data/environmental_sound_classification_50/archive/audio/audio/16000/", fs) |> 
+    shuffle_n_split |>
+    splits -> overlapping_splits(splits, n_samples, stepsize)
+
+signals=read_signals("./data/fluent_speech_commands_dataset/data/test_data.csv", "./data/fluent_speech_commands_dataset/", "7B4XmNppyrCK977p", fs, n_samples) |>
+    shuffle_n_split
+
+win=hanning(256+1)[2:end]
+m=length(win)
+
+f_low=300
+f_high=fs>>1
+M=filter_bank(d_in, m, fs, f_low, f_high)
+
+batchsize=32
+
+train=dataloader(signals.train,noises.train, win, M; batchsize=batchsize, shuffle=true)
+test=(oos=dataloader(signals.test,noises.test, win, M; batchsize=batchsize, shuffle=true),
+      is= dataloader(signals.train[1:length(signals.test)], noises.train[1:length(noises.test)], win, M; batchsize=batchsize, shuffle=true))
+
+
 dataloaderloss(loader, model=model)=mean([loss(model,withmask(batch)) for batch in loader])
 losses=[dataloaderloss(test.is, identity) dataloaderloss(test.oos, identity)]
 println("0: $losses")
 
 optimizerstate = Flux.setup(Adam(5e-4), model)
-epochs=1:6
+epochs=1:8
 
 function train!()
     @info "start training"

@@ -46,11 +46,11 @@ function mel_filter_bank(num_filters, fft_size, sample_rate, min_freq, max_freq)
     return filter_bank
 end
 
-function filter_bank(num_filters, fft_size, args...)
-    if num_filters == (fft_size ÷ 2)+1
+function filter_bank(num_filters, fft_size, sample_rate, min_freq, max_freq)
+    if num_filters == (fft_size Ã· 2)+1
         result=Diagonal(ones(num_filters))
     else
-        result=mel_filter_bank(num_filters, args...)
+        result=mel_filter_bank(num_filters, fft_size, sample_rate, min_freq, max_freq)
     end
     return result
 end
@@ -145,15 +145,3 @@ function dataloader(signals,noises,win,M; kwargs...)
     return result
 end
 
-win=hanning(256+1)[2:end]
-m=length(win)
-
-f_low=300
-f_high=fs>>1
-M=filter_bank(d_in, m, fs, f_low, f_high)
-
-batchsize=32
-
-train=dataloader(signals.train,noises.train, win, M; batchsize=batchsize, shuffle=true)
-test=(oos=dataloader(signals.test,noises.test, win, M; batchsize=batchsize, shuffle=true),
-      is= dataloader(signals.train[1:length(signals.test)], noises.train[1:length(noises.test)], win, M; batchsize=batchsize, shuffle=true))
