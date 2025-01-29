@@ -147,3 +147,5 @@ xlabel("epoch")
 grid()
 
 savefig("training.png")
+
+include("./audio_reconstruction.jl")

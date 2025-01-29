@@ -593,6 +593,8 @@ end
 @time train!()
 ```
 
+![Signal with noise](figures/training.png)
+
 
 
 
