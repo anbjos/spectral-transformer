@@ -1,27 +1,26 @@
-# Spectral Transformer
+# Spectral Transformer  
 
-The **Spectral Transformer** repository demonstrates the versatility of transformer-based AI models in signal processing tasks, with a particular focus on **audio applications** like noise suppression. Unlike traditional transformer inputs consisting of tokenized text, this project adapts modern transformer architectures to work directly with **audio signals** represented as mel-spectrograms. The transformers are customized to accommodate this unique input format, enabling highly effective signal analysis and modification.
+The **Spectral Transformer** repository explores the application of transformer-based AI models in signal processing, particularly for **audio tasks** like noise suppression. Instead of tokenized text, this implementation processes **audio signals** as mel-spectrograms, adapting transformer architectures to handle this input format effectively.  
 
-A key highlight is the integration of neural networks and digital signal processing (DSP) techniques. The results showcase the synergy of these approaches, achieving precise noise suppression while maintaining the **original signal's phase information**. Notably, this approach avoids the use of [vocoders](https://en.wikipedia.org/wiki/Phase_vocoder) for audio reconstruction, ensuring higher fidelity in the output.
+The project integrates neural networks with digital signal processing (DSP) techniques to enhance signal analysis and modification. This approach preserves the **original signal's phase information** while achieving precise noise suppression, eliminating the need for [vocoders](https://en.wikipedia.org/wiki/Phase_vocoder) in audio reconstruction and maintaining higher output fidelity.
 
-## Results
+## Results  
 
-Even with a relatively simple transformer network, excellent performance can be achieved in real-world scenarios, as illustrated by the following example. Using the challenging task of separating human speech from background noise (e.g., frog sounds), the network demonstrates its robustness. Specifically:
+The transformer-based model demonstrates effective noise suppression in real-world scenarios, such as separating human speech from background noise (e.g., frog sounds). The following example illustrates its performance:  
 
-1. **Signal with Noise** (Figure 1): This represents the input noisy speech signal, containing both human speech and frog sounds.
+1. **Noisy Input Signal** (Figure 1): The input audio contains both human speech and background noise.  
+   - ![Signal with noise](figures/with_noise.png)  
+   - [Listen to noisy signal](https://github.com/anbjos/spectral-transformer/blob/main/figures/with_noise.wav) (Download Raw to play the audio)  
 
-![Signal with noise](figures/with_noise.png)
-![Listen to signal with noise](https://github.com/anbjos/spectral-transformer/blob/main/figures/with_noise.wav) (Choose "Download Raw" to hear the audio)
+2. **Clean Reference Signal** (Figure 2): The clean speech signal serves as a reference for evaluation.  
+   - ![Signal without noise](figures/signal.png)  
+   - [Listen to clean signal](https://github.com/anbjos/spectral-transformer/blob/main/figures/signal.wav) (Download Raw to play the audio)  
 
-2. **Signal without Noise** (Figure 2): This is the clean speech signal, used as a reference for comparison.
+3. **Processed Output Signal** (Figure 3): The model’s output, where background noise is suppressed while retaining speech content.  
+   - ![Cleaned signal with noise](figures/result.png)  
+   - [Listen to processed result](https://github.com/anbjos/spectral-transformer/blob/main/figures/result.wav) (Download Raw to play the audio)  
 
-![Signal without noise](figures/signal.png)
-![Listen to signal](https://github.com/anbjos/spectral-transformer/blob/main/figures/signal.wav) (Choose "Download Raw" to hear the audio)
-
-3. **Cleaned Signal with Noise** (Figure 3): This audio is reconstructed from the network's output, demonstrating its ability to suppress noise and isolate speech, even with out-of-sample data.
-
-![Cleaned signal with noise](figures/result.png)
-![Listen to result](https://github.com/anbjos/spectral-transformer/blob/main/figures/result.wav) (Choose "Download Raw" to hear the audio)
+This demonstrates the model’s ability to isolate speech from noise, even with previously unseen data.
 
 ## Transformer
 
@@ -30,7 +29,7 @@ This section presents a textbook description of the Transformer, which may be sk
 
 ### Attention Head
 
-The attention mechanism is a foundational concept in modern deep learning architectures, such as the Transformer. It enables models to focus on specific elements of an input sequence when generating an output, capturing the relationships between elements of the sequence. This section provides a step-by-step explanation of how the attention mechanism operates for **a single attention head**, starting with input representation as matrices, followed by transformations into **queries (Q)**, **keys (K)**, and **values (V)**—all of which are *learned* representations rather than direct input data. The similarities between **Q** and **K** are then measured using a dot product, yielding weights that indicate how relevant each position is relative to the current query. These weights are subsequently applied to **V**, allowing the model to focus on and aggregate information from different parts of the sequence. Each step is described in terms of the matrix operations that underlie the mechanism.
+The attention mechanism is a foundational concept in modern deep learning architectures, such as the Transformer. It allows the model to capture relationships between elements in a sequence. This section provides a step-by-step explanation of how the attention mechanism operates for **a single attention head**, starting with input representation as matrices, followed by transformations into **queries (Q)**, **keys (K)**, and **values (V)**—all of which are *learned* representations rather than direct input data. The similarities between **Q** and **K** are then measured using a dot product, yielding weights that indicate how relevant each position is relative to the current query. These weights are subsequently applied to **V**, allowing the model to focus on and aggregate information from different parts of the sequence. Each step is described in terms of the matrix operations that underlie the mechanism.
 
 #### 1. Input Representation as a Matrix
 
@@ -74,7 +73,7 @@ After the transformations:
 
 #### 3. Attention Score Calculation
 
-The attention mechanism determines the relevance of each element in the sequence to every other element. This is done by computing a **similarity** score between queries and keys using a [dot product](https://en.wikipedia.org/wiki/Dot_product):
+The attention mechanism determines the relevance of each element in the sequence to every other element. This is done by computing a **attention** score between queries and keys using a [dot product](https://en.wikipedia.org/wiki/Dot_product). This score is then used to determine the influence that each key element have when computing the output representation for each query.:
 
 $$
 \text{Attention Score} = K^T Q
@@ -274,74 +273,66 @@ Both the **Input Embedding** matrix $W_{\text{emb}}$ and the **Output Projection
 
 ---
 
-## Positional Encoding
+## Positional Encoding  
 
-Without explicit positional information, the model sees only a set of token embeddings, with no inherent way to determine their order in the sequence. This means the model would need to learn the relationships between neighboring tokens solely from the data, without knowing which tokens are adjacent. Since this approach is inefficient, positional embeddings are introduced to provide the model with information about token positions.
+Without positional information, the model treats input embeddings as an unordered set, making it difficult to determine their order. This forces the model to learn relationships purely from data, without knowing which elements are adjacent—an inefficient approach. To address this, **positional encodings** are added to the input embeddings before feeding them into the model. These encodings provide explicit position information, allowing attention heads to infer order and relative positions within the sequence.
 
-### Definition of PE
-
-The positional encoding $\text{PE}(i, j)$ is defined for each embedding dimension $i$ and token position $j$ as:
+Positional encoding $\text{PE}(i, j)$ is defined as:  
 
 $$
-\text{PE}(i, j) =
+\text{PE}(i, j)=
 \begin{cases}
 \sin\left(\frac{j}{10000^{i/d}}\right), & \text{if } i \text{ is even}, \\
 \cos\left(\frac{j}{10000^{(i-1)/d}}\right), & \text{if } i \text{ is odd}.
 \end{cases}
 $$
 
-Here:
-- $j$ is the token's position in the sequence.
-- $i$ is the embedding dimension index.
-- $d$ is the embedding dimensionality.
+Where:  
+- $j$ is the token’s position.  
+- $i$ is the embedding dimension index.  
+- $d$ is the embedding size.  
 
-This creates a matrix $\mathbf{P}$ where each column represents a token’s positional encoding. The matrix is visualized below, showing that the embedding for the first position oscillates with a very high frequency, while the frequency decreases for larger positions.
+This generates a positional encoding matrix $\mathbf{P}$, where each column represents a token’s position. The visualization below shows that lower positions oscillate faster, while higher positions change more slowly.  
 
-![positional encoding](figures/position.png)
+![positional encoding](figures/position.png)  
 
-If we multiply the embeddings of two different positions and plot the resulting $sequence \times sequence$ matrix, the following pattern emerges:
+Multiplying positional embeddings of different positions and plotting the resulting **sequence × sequence** matrix reveals this pattern:  
 
-![distance](figures/distance.png)
+![distance](figures/distance.png)  
 
-The raw dot product between two positional encodings defines a function that measures the relative distance between the two positions. Since the attention mechanism involves a dot product between $K^T$ and $Q$, it *can* capture the relative distance between inputs in the sequence. The term *can* is used because this process also involves multiplication with learned weights, allowing the model to adjust these weights during training to capture embedded data, relative or absolute position, or a combination of both.
+The dot product between positional encodings defines a function measuring relative distance between positions. Since attention mechanisms compute **dot products between queries and keys**, they *can* capture positional relationships. However, since this also involves learned weights, the model can adjust its focus on absolute or relative positions based on training data.  
 
----
+### Dot Product of Positional Embeddings  
 
-### Dot product of positional Embeddings
+#### 1. Positional Encoding as Columns  
 
-#### 1. Column Construction (Position as Column Index)
+The positional encoding matrix $\mathbf{P}$ has:  
+- $d$ rows (embedding dimensions),  
+- $n$ columns (positions $j$ in the sequence).  
 
-To understand the mechanism behind this, assume the positional encoding matrix $\mathbf{P}$ has:
-- **$d$ rows** (each row corresponds to a dimension of the embedding),
-- **$n$ columns** (each column corresponds to a position $j$ in the sequence).
+Each position $j$ is represented as a column vector:  
 
-For position $j$, the column $\mathbf{p}\_j$ looks like
+$$\mathbf{p}_j = \bigl[\sin\bigl(\tfrac{j}{\alpha_0}\bigr),\,\cos\bigl(\tfrac{j}{\alpha_0}\bigr),\,\sin\bigl(\tfrac{j}{\alpha_1}\bigr),\,\cos\bigl(\tfrac{j}{\alpha_1}\bigr),\,\dots\bigr]^\top$$  
 
-$$\mathbf{p}\_j = \bigl[\sin\bigl(\tfrac{j}{\alpha\_0}\bigr),\,\cos\bigl(\tfrac{j}{\alpha\_0}\bigr),\,\sin\bigl(\tfrac{j}{\alpha\_1}\bigr),\,\cos\bigl(\tfrac{j}{\alpha\_1}\bigr),\,\dots\bigr]^\top$$
+where $\alpha_k$ (typically $10000^{k/d}$) controls the frequency of the sine-cosine pairs.  
 
-where each $\alpha\_k$ (often $10000^{k/d}$) controls the wavelength of the $k$-th sine/cosine pair.
+#### 2. Dot Product and Trigonometric Identity  
 
-#### 2. Dot Product Involves Sine-Cosine Products
+The dot product of two position vectors $\mathbf{p}_j$ and $\mathbf{p}_{j'}$ is:  
 
-To compute the dot product between two columns $\mathbf{p}\_j$ and $\mathbf{p}\_{j'}$ (positions $j$ and $j'$), we pairwise multiply elements and sum them:
+$$\mathbf{p}_j^\top\mathbf{p}_{j'} = \sum_{k} \bigl[\sin\bigl(\tfrac{j}{\alpha_k}\bigr)\sin\bigl(\tfrac{j'}{\alpha_k}\bigr) + \cos\bigl(\tfrac{j}{\alpha_k}\bigr)\cos\bigl(\tfrac{j'}{\alpha_k}\bigr)\bigr].$$  
 
-$$\mathbf{p}\_j^\top\mathbf{p}\_{j'} = \sum_{k\in\text{(sine/cos pairs)}}\bigl[\sin\bigl(\tfrac{j}{\alpha\_k}\bigr)\sin\bigl(\tfrac{j'}{\alpha\_k}\bigr) + \cos\bigl(\tfrac{j}{\alpha\_k}\bigr)\cos\bigl(\tfrac{j'}{\alpha\_k}\bigr)\bigr].$$
+Using the identity  
 
-Using the trigonometric identity
+$$\sin(A)\sin(B) + \cos(A)\cos(B) = \cos(A - B),$$  
 
-$$\sin(A)\sin(B)+\cos(A)\cos(B)=\cos(A-B),$$
+this simplifies to:  
 
-each sine-cosine pair becomes
+$$\mathbf{p}_j^\top\mathbf{p}_{j'} = \sum_{k} \cos\Bigl(\frac{j - j'}{\alpha_k}\Bigr).$$  
 
-$$\cos\bigl(\tfrac{j}{\alpha\_k}-\tfrac{j'}{\alpha\_k}\bigr)=\cos\Bigl(\tfrac{j-j'}{\alpha\_k}\Bigr).$$
+#### 3. Capturing Relative Position  
 
-#### 3. Dependence on $(j-j')$
-
-Summing across all frequencies $\alpha\_k$ yields terms of the form $\cos\bigl(\tfrac{j-j'}{\alpha\_k}\bigr)$. Hence, the dot product depends on the difference $(j-j')$:
-
-$$\mathbf{p}\_j \mathbf{p}\_{j'} = \sum_{k}\cos\Bigl(\frac{j-j'}{\alpha\_k}\Bigr).$$
-
-Because this expression depends only on $(j-j')$ and **not** on $j$ or $j'$ separately, it encodes the **relative distance** between these two positions in the sequence.
+Since the result depends only on $(j - j')$, positional encodings inherently encode **relative distance** between positions, which the model can use to infer sequential structure.
 
 ---
 
@@ -407,21 +398,21 @@ The `@functor` macro is used in this framework to expose learnable weights for a
 
 ## Audio Signal Processing
 
-Before feeding raw audio signals into the **Spectral Transformer**, they undergo a carefully designed signal processing pipeline. Each step in this pipeline is tailored to enhance the quality of the data and improve the neural network's performance. By addressing different aspects of the audio signal, these preprocessing steps ensure that the transformer operates on meaningful, well-structured data. The following sections describe each step and its purpose in preparing the signal for effective noise suppression.
+Before processing audio signals with the **Spectral Transformer**, they pass through a signal processing pipeline designed to structure the data for the neural network. Each step in this pipeline modifies the audio to improve model performance. The following sections describe these preprocessing steps and their role in preparing the signal for noise suppression.
 
 ---
 
 ### Short-Time Fourier Transform
 
-The first step involves applying the [Short-Time Fourier Transform (STFT)](https://en.wikipedia.org/wiki/Short-time_Fourier_transform) to convert the audio signal from the time domain to a sequence of Short Fourier Transforms. This is done using an [FFT](https://en.wikipedia.org/wiki/Fast_Fourier_transform) length of $d_U$ and a modified [Hanning window](https://en.wikipedia.org/wiki/Hann_function):
+The first step involves applying the [Short-Time Fourier Transform (STFT)](https://en.wikipedia.org/wiki/Short-time_Fourier_transform) to convert the audio signal from the time domain to a sequence of Short Fourier Transforms. This is done using an [FFT](https://en.wikipedia.org/wiki/Fast_Fourier_transform) length of $m$ and a modified [Hanning window](https://en.wikipedia.org/wiki/Hann_function):
 
-$$h(k) = \sin^2\left(\frac{\pi k}{d_U}\right), \quad k \in [1 \dots d_U]$$
+$$h(k) = \sin^2\left(\frac{\pi k}{m}\right), \quad k \in [1 \dots m]$$
 
-Although the first element of this window is not zero, it is still effective due to its smooth tapering, which minimizes spectral leakage. Overlapping windows (with a step size of $\frac{d_U}{2}$) ensure continuity, as the peak value (1) of one window aligns with the zero value of the previous, and the sum of overlapping window values is always 1. This simplifies signal reconstruction (see **Signal Reconstruction** for details).
+Although the first element of this window is not zero, it is still effective due to its smooth tapering, which minimizes spectral leakage. Overlapping windows (with a step size of $\frac{m}{2}$) ensure continuity, as the peak value (1) of one window aligns with the zero value of the previous, and the sum of overlapping window values is always 1. This simplifies signal reconstruction (see **Signal Reconstruction** for details).
 
 The resulting STFT is given by:
 
-$$X_{\mathbb{C}} = \text{stft}(u_{audio}, h, \text{step} = \frac{d_U}{2})$$
+$$X_{\mathbb{C}} = \text{stft}(u_{audio}, h, \text{step} = \frac{m}{2})$$
 
 Here, the subscript $\mathbb{C}$ indicates that the resulting matrix is complex, containing both amplitude and phase information in the frequency domain. For a real input signal, the STFT returns the [DC component](https://en.wikipedia.org/wiki/DC_bias), positive frequencies, and the [Nyquist frequency](https://en.wikipedia.org/wiki/Nyquist_frequency), since negative frequencies are the complex conjugates of positive ones.
 
@@ -443,7 +434,7 @@ Human perception is more sensitive to variations in lower frequencies, which all
 
 This step involves a straightforward linear transformation:
 
-$$X_M = dB(M \times X_P), \quad M \in \mathbb{R}^{m \times d_U}, \quad X_M \in \mathbb{R}^{m \times n}$$
+$$X_M = dB(M \times X_P), \quad M \in \mathbb{R}^{d_U \times m}, \quad X_M \in \mathbb{R}^{d_U \times n}$$
 
 A code snippet for constructing the Mel filter matrix $M$ can be found at [Practical Cryptography](http://practicalcryptography.com/miscellaneous/machine-learning/guide-mel-frequency-cepstral-coefficients-mfccs/) and can be easily adapted to Julia. The figure below illustrates the structure of the matrix $M$. Each graph corresponds to one row in $M$, with the axes representing the frequency bins and their respective weights in the summarization performed by the multiplication with $M$.
 
@@ -473,8 +464,6 @@ One issue with the logarithmic representation is that low power levels, which do
 
 The final step before feeding the data to the model is **whitening**, which normalizes the signal by setting its mean to zero and standard deviation to one. This ensures consistent input statistics, improving training stability and convergence. The stored bias and scaling factors are later used to reverse the transformation on the model’s output, allowing correct reconstruction of the enhanced audio.
 
-Whitening helps reduce bias from background noise and enhances model generalization by ensuring the network focuses on patterns rather than variations in magnitude. This step is crucial for reliable performance across diverse audio signals.
-
 $$U=whiten(clamp(X_M))$$
 
 ## Audio Signal Reconstruction
@@ -495,9 +484,14 @@ $$\text{antidB}(dB)=10^{\frac{dB}{10}}$$
 
 ### Attenuation
 
+The result of anti-dB in in the form $Y_P \in \mathbb{R}^{d_U \times n}$. We want to consider $Y_P$ and $X_P \in \mathbb{C}^{m \times n}$ to come up with a attenuation that can be applied to $X_{\mathbb{C}}$. Applying the input processing chain to this attenuated version of $X_{\mathbb{C}}$ should then result in a $X_P$ that is identical with the model output after anti whitening and anti-dB.
+
+The problem is that $m \ge d_U$, meaning that our system is underdetermined and there therefore is many attenuations that achieve this. One way to get around this is to consider the MEL transformation, that can be considered as a dimention reduction from $m$ to $d_U$. This mean that each element in the MEL representation account for a number of bins in the original representation. To persue this approach, we first define the matrix $\tilde{M}$ where all all-zero columns are stripped off, thereby leaving bins that is not seen by the transformer out for now.
+
 For each column $u\_P$ in $U\_P$, we aim to define an attenuation that can be applied to each element of $u\_P$. The attenuated version of $u\_P$ should yield the same power output during audio processing as the corresponding output $y$ from the transformer model, where $y$ is the column in $Y$ corresponding to $u\_P$.
 
 Inspection of $M$ shows that it contains all-zero rows, meaning that multiplying any vector by $M$ results in a non-regular system of equations. To address this, we first define a modified version of $M$ that excludes zero rows. We introduce the function $\text{RegularRows}(M)$, which removes all-zero rows from $M$. This function is extended to $\text{RegularRows}(u\_P, M)$, which removes corresponding rows in $u\_P$ that align with the zero rows in $M$.
+
 
 $$\tilde{M}=\text{RegularRows}(M),\quad \tilde{M}\in\mathbb{R}^{\tilde{m}\times n}$$
 
@@ -527,6 +521,8 @@ Where the square root is applied element wise.
 
 The attenuation is then applied to the corresponding column of $X_{\mathbb{C}}$ to create $Y_{\mathbb{C}}$.
 
+### Anti-STFT
+
 The audio output signal is then created as:
 
 $$
@@ -545,7 +541,7 @@ Noise samples are frog sounds taken from the [Environmental Sound Classification
 
 At this point, the samples are first shuffled and then split into 10% [out-of-sample](https://en.wikipedia.org/wiki/Cross-validation_(statistics)) data for verification and 90% [in-sample](https://en.wikipedia.org/wiki/Cross-validation_(statistics)) data for training. Both sets undergo the same processing pipeline.
 
-All data are [sample-rate converted](https://en.wikipedia.org/wiki/Sample-rate_conversion) to a common sample rate of \( f_s = 8192 \text{ Hz} \).
+All data are [sample-rate converted](https://en.wikipedia.org/wiki/Sample-rate_conversion) to a common sample rate of $f_s = 8192 \text{ Hz}$.
 
 The volume of the samples is set by first applying an \( \alpha \)-filter with adjustable attack/decay time to the Hilbert transform of the data, defining the [envelope](https://en.wikipedia.org/wiki/Envelope_(music)) of the signal. The signal is then amplified or attenuated so that the maximum value of the envelope reaches a fixed level. This level is consistent across both noise and speech signals.
 
