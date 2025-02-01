@@ -323,7 +323,7 @@ where $\alpha_k$ (typically $10000^{k/d}$) controls the frequency of the sine-co
 The dot product of two position vectors $p_j$ and $p_{j'}$ is:  
 
 $$
-\mathbf{p}_j^\top\mathbf{p}_{j'} = \sum_{k} \bigl[\sin\bigl(\tfrac{j}{\alpha_k}\bigr)\sin\bigl(\tfrac{j'}{\alpha_k}\bigr) + \cos\bigl(\tfrac{j}{\alpha_k}\bigr)\cos\bigl(\tfrac{j'}{\alpha_k}\bigr)\bigr].
+p_j^{\top} p_{j'} = \sum_{k} \bigl[\sin\bigl(\tfrac{j}{\alpha_k}\bigr)\sin\bigl(\tfrac{j'}{\alpha_k}\bigr) + \cos\bigl(\tfrac{j}{\alpha_k}\bigr)\cos\bigl(\tfrac{j'}{\alpha_k}\bigr)\bigr].
 $$  
 
 Using the identity  
@@ -332,7 +332,9 @@ $$\sin(A)\sin(B) + \cos(A)\cos(B) = \cos(A - B),$$
 
 this simplifies to:  
 
-$$\mathbf{p}_j^\top\mathbf{p}_{j'} = \sum_{k} \cos\Bigl(\frac{j - j'}{\alpha_k}\Bigr).$$  
+$$
+p_j^{\top} p_{j'}  = \sum_{k} \cos\Bigl(\frac{j - j'}{\alpha_k}\Bigr).
+$$  
 
 #### 3. Capturing Relative Position  
 
