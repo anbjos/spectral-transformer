@@ -312,15 +312,19 @@ The positional encoding matrix $\mathbf{P}$ has:
 
 Each position $j$ is represented as a column vector:  
 
-$$\mathbf{p}_j = \bigl[\sin\bigl(\tfrac{j}{\alpha_0}\bigr),\,\cos\bigl(\tfrac{j}{\alpha_0}\bigr),\,\sin\bigl(\tfrac{j}{\alpha_1}\bigr),\,\cos\bigl(\tfrac{j}{\alpha_1}\bigr),\,\dots\bigr]^\top$$  
+$$
+\mathbf{p}_j = \bigl[\sin\bigl(\tfrac{j}{\alpha_0}\bigr),\,\cos\bigl(\tfrac{j}{\alpha_0}\bigr),\,\sin\bigl(\tfrac{j}{\alpha_1}\bigr),\,\cos\bigl(\tfrac{j}{\alpha_1}\bigr),\,\dots\bigr]^\top
+$$  
 
 where $\alpha_k$ (typically $10000^{k/d}$) controls the frequency of the sine-cosine pairs.  
 
 #### 2. Dot Product and Trigonometric Identity  
 
-The dot product of two position vectors $\mathbf{p}_j$ and $\mathbf{p}_{j'}$ is:  
+The dot product of two position vectors $p_j$ and $p_{j'}$ is:  
 
-$$\mathbf{p}_j^\top\mathbf{p}_{j'} = \sum_{k} \bigl[\sin\bigl(\tfrac{j}{\alpha_k}\bigr)\sin\bigl(\tfrac{j'}{\alpha_k}\bigr) + \cos\bigl(\tfrac{j}{\alpha_k}\bigr)\cos\bigl(\tfrac{j'}{\alpha_k}\bigr)\bigr].$$  
+$$
+\mathbf{p}_j^\top\mathbf{p}_{j'} = \sum_{k} \bigl[\sin\bigl(\tfrac{j}{\alpha_k}\bigr)\sin\bigl(\tfrac{j'}{\alpha_k}\bigr) + \cos\bigl(\tfrac{j}{\alpha_k}\bigr)\cos\bigl(\tfrac{j'}{\alpha_k}\bigr)\bigr].
+$$  
 
 Using the identity  
 
@@ -484,18 +488,18 @@ $$\text{antidB}(dB)=10^{\frac{dB}{10}}$$
 
 ### Attenuation
 
-The result of anti-dB in in the form $Y_P \in \mathbb{R}^{d_U \times n}$. We want to consider $Y_P$ and $X_P \in \mathbb{C}^{m \times n}$ to come up with a attenuation that can be applied to $X_{\mathbb{C}}$. Applying the input processing chain to this attenuated version of $X_{\mathbb{C}}$ should then result in a $X_P$ that is identical with the model output after anti whitening and anti-dB.
+The result of anti-dB in in the form $Y_P \in \mathbb{R}^{d_U \times n}$. We want to consider $Y_P$ and $X_P \in \mathbb{R}^{m \times n}$ to come up with a attenuation that can be applied to $X_{\mathbb{C}}$. Applying the input processing chain to this attenuated version of $X_{\mathbb{C}}$ should then result in a $X_P$ that is identical with the model output $Y_P$ after anti whitening and anti-dB.
 
 The problem is that $m \ge d_U$, meaning that our system is underdetermined and there therefore is many attenuations that achieve this. One way to get around this is to consider the MEL transformation, that can be considered as a dimention reduction from $m$ to $d_U$. This mean that each element in the MEL representation account for a number of bins in the original representation. To persue this approach, we first define the matrix $\tilde{M}$ where all all-zero columns are stripped off, thereby leaving bins that is not seen by the transformer out for now.
 
-For each column $u\_P$ in $U\_P$, we aim to define an attenuation that can be applied to each element of $u\_P$. The attenuated version of $u\_P$ should yield the same power output during audio processing as the corresponding output $y$ from the transformer model, where $y$ is the column in $Y$ corresponding to $u\_P$.
+For each column $u_P$ in $U_P$, we aim to define an attenuation that can be applied to each element of $u\_P$. The attenuated version of $u\_P$ should yield the same power output during audio processing as the corresponding output $y$ from the transformer model, where $y$ is the column in $Y$ corresponding to $u\_P$.
 
-Inspection of $M$ shows that it contains all-zero rows, meaning that multiplying any vector by $M$ results in a non-regular system of equations. To address this, we first define a modified version of $M$ that excludes zero rows. We introduce the function $\text{RegularRows}(M)$, which removes all-zero rows from $M$. This function is extended to $\text{RegularRows}(u\_P, M)$, which removes corresponding rows in $u\_P$ that align with the zero rows in $M$.
+
 
 
 $$\tilde{M}=\text{RegularRows}(M),\quad \tilde{M}\in\mathbb{R}^{\tilde{m}\times n}$$
 
-$$\tilde{u}\_P=\text{RegularRows}(u\_P, M),\quad \tilde{u}\_P\in\mathbb{R}^{\tilde{m}}$$
+$$\tilde{u}_P=\text{RegularRows}(u_P, M),\quad \tilde{u}_P\in\mathbb{R}^{\tilde{m}}$$
 
 where $\tilde{m}$ represents the number of non-zero rows in $M$.
 
@@ -526,7 +530,7 @@ The attenuation is then applied to the corresponding column of $X_{\mathbb{C}}$ 
 The audio output signal is then created as:
 
 $$
-y_{audio}=antisftf(Y_{\mathbb{C}}, step=\frac{d_U}{2})
+y_{audio}=antisftf(Y_{\mathbb{C}}, step=\frac{m}{2})
 $$
 
 Where $antisftr$ simply convert each $fft$ back into the time domain and add overlapping audio segment to reconstruct the cleaned audio signal.
