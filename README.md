@@ -490,16 +490,15 @@ $$\text{antidB}(dB)=10^{\frac{dB}{10}}$$
 
 ### Attenuation
 
-The result of anti-dB in in the form $Y_P \in \mathbb{R}^{d_U \times n}$. We want to consider $Y_P$ and $X_P \in \mathbb{R}^{m \times n}$ to come up with a attenuation that can be applied to $X_{\mathbb{C}}$. Applying the input processing chain to this attenuated version of $X_{\mathbb{C}}$ should then result in a $X_P$ that is identical with the model output $Y_P$ after anti whitening and anti-dB.
+At this point $Y_M$ represents the clean signal power in MEL domain. What is need now is to determine an attenaution of $X_P$, such that the MEL representation of this is idential to $Y_M$. If we consider a pair of columns, $y_M$ and $x_P$ in $Y_P$ and $X_P$, then this can be written as:
 
-The problem is that $m \ge d_U$, meaning that our system is underdetermined and there therefore is many attenuations that achieve this. One way to get around this is to consider the MEL transformation, that can be considered as a dimention reduction from $m$ to $d_U$. This mean that each element in the MEL representation account for a number of bins in the original representation. To persue this approach, we first define the matrix $\tilde{M}$ where all all-zero columns are stripped off, thereby leaving bins that is not seen by the transformer out for now.
+$$
+y_P=M Diagonal(attenuation) x_P
+$$
 
-For each column $u_P$ in $U_P$, we aim to define an attenuation that can be applied to each element of $u\_P$. The attenuated version of $u\_P$ should yield the same power output during audio processing as the corresponding output $y$ from the transformer model, where $y$ is the column in $Y$ corresponding to $u\_P$.
+Where $attenuation \in \mathbb{R}^m$. The problem is that $y_{P} \in \mathbb{R}^{d_U}$ and $m \ge d_U$, meaning that our system is underdetermined and there therefore is many attenuations that achieve this. One way to get around this is to consider the MEL transformation, that can be considered as a dimention reduction from $m$ to $d_U$. This mean that each element in the MEL representation account for a number of bins in the original representation. To persue this approach, we first define the matrix $\tilde{M}$ where all all-zero columns are stripped off, thereby leaving bins that is not seen by the transformer out for now.
 
-
-
-
-$$\tilde{M}=\text{RegularRows}(M),\quad \tilde{M}\in\mathbb{R}^{\tilde{m}\times n}$$
+$$\tilde{M}=\text{RegularRows}(M),\quad \tilde{M}\in\mathbb{R}^{d_U \times \tilde{m}}$$
 
 $$\tilde{u}_P=\text{RegularRows}(u_P, M),\quad \tilde{u}_P\in\mathbb{R}^{\tilde{m}}$$
 
