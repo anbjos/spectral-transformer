@@ -490,41 +490,57 @@ $$\text{antidB}(dB)=10^{\frac{dB}{10}}$$
 
 ### Attenuation
 
-At this point $Y_M$ represents the clean signal power in MEL domain. What is need now is to determine an attenaution of $X_P$, such that the MEL representation of this is idential to $Y_M$. If we consider a pair of columns, $y_M$ and $x_P$ in $Y_P$ and $X_P$, then this can be written as:
-
+$Y_M$ is the model's estimate of a noise-free signal in the MEL domain. To reconstruct a noise-free audio signal, we must find an attenuation vector 
 $$
-y_P=M Diagonal(attenuation) x_P
+\text{attenuation}\in\mathbb{R}^m
 $$
-
-Where $attenuation \in \mathbb{R}^m$. The problem is that $y_{P} \in \mathbb{R}^{d_U}$ and $m \ge d_U$, meaning that our system is underdetermined and there therefore is many attenuations that achieve this. One way to get around this is to consider the MEL transformation, that can be considered as a dimention reduction from $m$ to $d_U$. This mean that each element in the MEL representation account for a number of bins in the original representation. To persue this approach, we first define the matrix $\tilde{M}$ where all all-zero columns are stripped off, thereby leaving bins that is not seen by the transformer out for now.
-
-$$\tilde{M}=\text{RegularRows}(M),\quad \tilde{M}\in\mathbb{R}^{d_U \times \tilde{m}}$$
-
-$$\tilde{u}_P=\text{RegularRows}(u_P, M),\quad \tilde{u}_P\in\mathbb{R}^{\tilde{m}}$$
-
-where $\tilde{m}$ represents the number of non-zero rows in $M$.
-
-Next, we introduce $w\in\mathbb{R}^{\tilde{m}}$, where $\tilde{M}\cdot w$ represents the desired attenuation. The relationship is expressed as:
-
-$$y=\tilde{M}\cdot \text{Diagonal}(\tilde{M}^{T}w)\cdot \tilde{u}\_P$$
-
-Here, $\text{Diagonal}(\tilde{M}^{T} w)$ represents an attenuation applied to the vector $\tilde{u}\_P$. Since $U\_P$ represents power, this equation ensures that the attenuated version maintains the same power output. This can be rewritten as a linear system:
-
-$$y=\tilde{M}\cdot \text{Diagonal}(\tilde{M}^{T} \cdot \tilde{u}\_P)\cdot w$$
-
-From $w$, we can derive the attenuation we are seeking:
-
-$$\text{PowerAttenuation}=\text{ReconstructRows}(clamp(\tilde{M}^{T} w,0,1), M)$$
-
-Finally, we must account for the zero rows that were removed from $M$. To do this, we define the function $\text{ReconstructRows}(\tilde{u}\_P, M)$, which reinserts zeros at the positions of the discarded rows in $\tilde{u}\_P$. The reconstructed signal, representing the attenuated power, can then be written as:
-
+that can be applied to the original signal 
 $$
-attenuation=[\sqrt{PowerAttenuation_{i,j}}]
+X_{\mathbb{C}}\in\mathbb{C}^{m\times n}
 $$
+so that, when the same signal chain up to the model is applied, the result is identical to $Y_M$. This requirement is equivalent to:
+$$
+Y_P=M\cdot\operatorname{Diagonal}(\text{attenuation})\cdot X_P
+$$
+Considering a pair of columns, $y_P$ and $x_P$, in $Y_P$ and $X_P$ respectively, we can write:
+$$
+y_P=M\cdot\operatorname{Diagonal}(\text{attenuation})\cdot x_P
+$$
+However, since $y_P\in\mathbb{R}^{d_U}$ and $m\ge d_U$, our system is underdetermined; there are many attenuation vectors that can produce the desired outcome. One way to address this is by considering the MEL transformation as a dimensionality reduction from $m$ to $d_U$. In this view, each element in the MEL representation aggregates information from several bins of the original representation.
 
-Where the square root is applied element wise.
+To pursue this approach, we first define the matrix 
+$$
+\tilde{M}=\text{RegularRows}(M),\quad\tilde{M}\in\mathbb{R}^{d_U\times\tilde{m}}
+$$
+by removing all all-zero columns from $M$, thereby excluding the bins that are not seen by the transformer, and similarly,
+$$
+\tilde{u}\_P=\text{RegularRows}(u_P,M),\quad\tilde{u}\_P\in\mathbb{R}^{\tilde{m}}
+$$
+where $\tilde{m}$ represents the number of nonzero rows in $M$.
 
-The attenuation is then applied to the corresponding column of $X_{\mathbb{C}}$ to create $Y_{\mathbb{C}}$.
+Next, we introduce a vector 
+$$
+w\in\mathbb{R}^{\tilde{m}}
+$$
+such that $\tilde{M}\cdot w$ represents the desired attenuation. We express the relationship as:
+$$
+y=\tilde{M}\cdot\operatorname{Diagonal}(\tilde{M}^{T}w)\cdot\tilde{u}\_P
+$$
+where $\operatorname{Diagonal}(\tilde{M}^{T}w)$ applies an attenuation to the vector $\tilde{u}\_P$. Since $u_P$ represents power, this formulation ensures that the attenuated version maintains the same power output. We can rewrite this as a linear system:
+$$
+y=\tilde{M}\cdot\operatorname{Diagonal}(\tilde{M}^{T}\tilde{u}\_P)\cdot w
+$$
+From $w$, we derive the desired attenuation:
+$$
+\text{PowerAttenuation}=\text{ReconstructRows}\Bigl(\operatorname{clamp}(\tilde{M}^{T}w,0,1),\,M\Bigr)
+$$
+Here, the function $\operatorname{clamp}(\cdot,0,1)$ ensures that the attenuation values remain between 0 and 1, and the function $\text{ReconstructRows}(\cdot,M)$ reinserts zeros at the positions of the discarded rows in $M$.
+
+Finally, the overall attenuation is obtained by taking the element-wise square root of the power attenuation:
+$$
+\text{attenuation}=\bigl[\sqrt{\text{PowerAttenuation}_{i,j}}\bigr]
+$$
+which is then applied to the corresponding column of $X_{\mathbb{C}}$ to create $Y_{\mathbb{C}}$.
 
 ### Anti-STFT
 
