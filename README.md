@@ -500,11 +500,11 @@ X_{\mathbb{C}}\in\mathbb{C}^{m\times n}
 $$
 so that, when the same signal chain up to the model is applied, the result is identical to $Y_M$. This requirement is equivalent to:
 $$
-Y_P=M\cdot\operatorname{Diagonal}(\text{attenuation})\cdot X_P
+Y_P=M\cdot\text{Diagonal}(\text{attenuation})\cdot X_P
 $$
 Considering a pair of columns, $y_P$ and $x_P$, in $Y_P$ and $X_P$ respectively, we can write:
 $$
-y_P=M\cdot\operatorname{Diagonal}(\text{attenuation})\cdot x_P
+y_P=M\cdot\text{Diagonal}(\text{attenuation})\cdot x_P
 $$
 However, since $y_P\in\mathbb{R}^{d_U}$ and $m\ge d_U$, our system is underdetermined; there are many attenuation vectors that can produce the desired outcome. One way to address this is by considering the MEL transformation as a dimensionality reduction from $m$ to $d_U$. In this view, each element in the MEL representation aggregates information from several bins of the original representation.
 
@@ -524,17 +524,17 @@ w\in\mathbb{R}^{\tilde{m}}
 $$
 such that $\tilde{M}\cdot w$ represents the desired attenuation. We express the relationship as:
 $$
-y=\tilde{M}\cdot\operatorname{Diagonal}(\tilde{M}^{T}w)\cdot\tilde{u}\_P
+y=\tilde{M}\cdot\text{Diagonal}(\tilde{M}^{T}w)\cdot\tilde{u}\_P
 $$
-where $\operatorname{Diagonal}(\tilde{M}^{T}w)$ applies an attenuation to the vector $\tilde{u}\_P$. Since $u_P$ represents power, this formulation ensures that the attenuated version maintains the same power output. We can rewrite this as a linear system:
+where $\text{Diagonal}(\tilde{M}^{T}w)$ applies an attenuation to the vector $\tilde{u}\_P$. Since $u_P$ represents power, this formulation ensures that the attenuated version maintains the same power output. We can rewrite this as a linear system:
 $$
-y=\tilde{M}\cdot\operatorname{Diagonal}(\tilde{M}^{T}\tilde{u}\_P)\cdot w
+y=\tilde{M}\cdot\text{Diagonal}(\tilde{M}^{T}\tilde{u}\_P)\cdot w
 $$
 From $w$, we derive the desired attenuation:
 $$
-\text{PowerAttenuation}=\text{ReconstructRows}\Bigl(\operatorname{clamp}(\tilde{M}^{T}w,0,1),\,M\Bigr)
+\text{PowerAttenuation}=\text{ReconstructRows}\Bigl(\text{clamp}(\tilde{M}^{T}w,0,1),\,M\Bigr)
 $$
-Here, the function $\operatorname{clamp}(\cdot,0,1)$ ensures that the attenuation values remain between 0 and 1, and the function $\text{ReconstructRows}(\cdot,M)$ reinserts zeros at the positions of the discarded rows in $M$.
+Here, the function $\text{clamp}(\cdot,0,1)$ ensures that the attenuation values remain between 0 and 1, and the function $\text{ReconstructRows}(\cdot,M)$ reinserts zeros at the positions of the discarded rows in $M$.
 
 Finally, the overall attenuation is obtained by taking the element-wise square root of the power attenuation:
 $$
